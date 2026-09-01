@@ -1585,6 +1585,23 @@ export class FlowBuilderWebview {
       if (!step) continue;
       const stepStartedAt = Date.now();
       try {
+        // Ensure active page is fresh and not closed across steps (e.g. popups, redirects)
+        if (!page || page.isClosed()) {
+          if (this.pwBrowser && this.pwBrowser.isConnected()) {
+            const contexts = this.pwBrowser.contexts();
+            for (const ctx of contexts) {
+              const openPages = ctx.pages().filter((p: any) => !p.isClosed());
+              if (openPages.length) {
+                page = openPages[openPages.length - 1];
+                this.pwPage = page;
+                break;
+              }
+            }
+          }
+          if (!page || page.isClosed()) {
+            page = await this.ensurePlaywrightPage();
+          }
+        }
         await this.runPlaywrightStep(page, step);
         const screenshot = await this.captureStepScreenshot(page);
         reportSteps.push({ name: step.label || step.type || `Step ${index + 1}`, status: 'passed', durationMs: Date.now() - stepStartedAt, screenshot });
@@ -1612,11 +1629,16 @@ export class FlowBuilderWebview {
   private async runPlaywrightStep(page: any, step: FlowStepMessage, row: Record<string, unknown> = {}): Promise<void> {
     const target = await this.resolveFlowValue(step.target, row);
     const value = await this.resolveFlowValue(step.value, row);
-    const locator = await this.resolvePlaywrightLocator(page, target);
+    let currentPage = page;
+    if (!currentPage || currentPage.isClosed()) {
+      currentPage = this.pwPage || await this.ensurePlaywrightPage();
+    }
+    const locator = await this.resolvePlaywrightLocator(currentPage, target);
     switch (step.type) {
       case 'click':
         if (!locator) throw new Error('Click step has no locator.');
         await locator.click();
+        await currentPage.waitForLoadState('domcontentloaded', { timeout: 6000 }).catch(() => {});
         return;
       case 'navigate':
         await this.ensurePlaywrightPage(value || target || 'about:blank');
@@ -1658,21 +1680,23 @@ export class FlowBuilderWebview {
         if (!locator) throw new Error('Drag-and-drop step has no source locator.');
         const destination = await this.resolveFlowValue(step.value, row);
         if (!destination) throw new Error('Drag-and-drop step has no destination locator.');
-        await locator.dragTo(page.locator(destination));
+        await locator.dragTo(currentPage.locator(destination));
         return;
       }
       case 'pressKey':
         if (locator) await locator.press(value || 'Enter');
-        else await page.keyboard.press(value || 'Enter');
+        else await currentPage.keyboard.press(value || 'Enter');
         return;
       case 'verify':
       case 'assertVisible':
       case 'waitForElement':
         if (!locator) throw new Error(`${step.type} step has no locator.`);
-        await locator.waitFor({ state: 'visible', timeout: Number(value) || 10000 });
+        await currentPage.waitForLoadState('domcontentloaded', { timeout: 6000 }).catch(() => {});
+        await locator.waitFor({ state: 'visible', timeout: Number(value) || 12000 });
         return;
       case 'assertText':
         if (!locator) throw new Error('Text assertion has no locator.');
+        await currentPage.waitForLoadState('domcontentloaded', { timeout: 6000 }).catch(() => {});
         await locator.getByText(value).first().waitFor({ state: 'visible', timeout: 10000 }).catch(async () => {
           const text = await locator.textContent();
           if (!text?.includes(value)) throw new Error(`Expected text "${value}" was not found.`);
@@ -2468,26 +2492,42 @@ function executableNodes(){return nodes.filter(n=>!['start','end','condition'].i
 function previewExecutionSteps(steps){return steps.flatMap(step=>step.type==='loop'&&step.children?.length?Array.from({length:Math.max(0,Number(step.value)||0)},()=>step.children).flat():[step])}
 
 function render(){
-  if(scenarios[activeScenarioIndex])scenarios[activeScenarioIndex].nodes=nodes;
-  const surface=activeMode==='surface';
-  document.getElementById('subbar').classList.toggle('surface-mode',surface);
-  document.getElementById('mode-pill').textContent=surface?'Surface':'PW';
-  document.getElementById('mode-pill').classList.toggle('surface',surface);
-  document.getElementById('project-name').textContent=builderProjectName||'Select a project';
-  document.getElementById('project-description').textContent=surface?'Screenshot → choose app → analyze → ordered flowchart':'URL → inspect DOM → highlight → select elements';
-  document.getElementById('canvas-title').textContent=surface?'Surface flowchart + screenshot analysis':'PW flowchart + live DOM inspection';
-  document.getElementById('canvas-hint').textContent=surface?'Upload or capture a screenshot, then build ordered sequence':'Click a step in the center to edit it on the right';
-  renderScenarioBar();
-  renderExamplesPanel();
-  renderTools();
-  renderSidebar();
-  renderCanvas();
-  renderInspector();
-  document.getElementById('code-output').textContent=generateCode();
-  document.getElementById('gherkin-output').textContent=generateGherkin();
-  document.getElementById('dirty-state').textContent='Unsaved changes';
-  showTab(tab);
-  applyCanvasZoom();
+  try {
+    if(scenarios[activeScenarioIndex])scenarios[activeScenarioIndex].nodes=nodes;
+    const surface=activeMode==='surface';
+    const subbar=document.getElementById('subbar');
+    if(subbar) subbar.classList.toggle('surface-mode',surface);
+    const modePill=document.getElementById('mode-pill');
+    if(modePill) {
+      modePill.textContent=surface?'Surface':'PW';
+      modePill.classList.toggle('surface',surface);
+    }
+    const projName=document.getElementById('project-name');
+    if(projName) projName.textContent=builderProjectName||'Select a project';
+    const projDesc=document.getElementById('project-description');
+    if(projDesc) projDesc.textContent=surface?'Screenshot → choose app → analyze → ordered flowchart':'URL → inspect DOM → highlight → select elements';
+    const canvasTitle=document.getElementById('canvas-title');
+    if(canvasTitle) canvasTitle.textContent=surface?'Surface flowchart + screenshot analysis':'PW flowchart + live DOM inspection';
+    const canvasHint=document.getElementById('canvas-hint');
+    if(canvasHint) canvasHint.textContent=surface?'Upload or capture a screenshot, then build ordered sequence':'Click a step in the center to edit it on the right';
+    renderScenarioBar();
+    renderExamplesPanel();
+    renderTools();
+    renderSidebar();
+    renderCanvas();
+    renderInspector();
+    renderSurfaceInspector();
+    const codeOut=document.getElementById('code-output');
+    if(codeOut) codeOut.textContent=generateCode();
+    const gherkinOut=document.getElementById('gherkin-output');
+    if(gherkinOut) gherkinOut.textContent=generateGherkin();
+    const dirtyEl=document.getElementById('dirty-state');
+    if(dirtyEl && dirtyEl.textContent!=='Saved') dirtyEl.textContent='Unsaved changes';
+    showTab(tab);
+    applyCanvasZoom();
+  } catch(e) {
+    console.error('Render error:', e);
+  }
 }
 
 function renderScenarioBar(){
@@ -2700,10 +2740,21 @@ function deleteScenario(index){
 }
 
 function renderTools(){
+  const tools=document.getElementById('mode-tools');
+  if(!tools)return;
   if(activeMode==='surface'){
-    document.getElementById('mode-tools').innerHTML='<div class="surface-tools"><select id="surface-app-select" aria-label="Application window" onchange="selectSurfaceApp(this.value)">'+(surfaceWindows.length?surfaceWindows.map(w=>'<option value="'+escapeHtml(w.id)+'">'+escapeHtml(w.label)+'</option>').join(''):'<option value="">No windows — click Refresh apps</option>')+'</select><button class="button ghost" title="Refresh application windows" onclick="refreshSurfaceApps()">↻ Refresh apps</button><button class="button surface" onclick="uploadScreenshot()">⇧ Upload screenshot</button><button class="button surface" onclick="captureScreenshot()">◉ Capture app</button><button class="button surface" title="Open Screen Analyzer modal" onclick="openScreenAnalyzer()">🔍 Screen Analyzer</button><button class="button primary" onclick="analyzeScreenshot()">✦ Analyze</button><span class="analysis-status">'+(surfaceAnalyzing?'Analyzing OCR…':surfaceControls.length?'Screen analyzed · '+surfaceControls.length+' controls':'Screen not analyzed')+'</span></div>';
+    const current=tools.querySelector('.surface-tools');
+    if(!current){
+      tools.innerHTML='<div class="surface-tools"><select id="surface-app-select" aria-label="Application window" onchange="selectSurfaceApp(this.value)">'+(surfaceWindows.length?surfaceWindows.map(w=>'<option value="'+escapeHtml(w.id)+'">'+escapeHtml(w.label)+'</option>').join(''):'<option value="">No windows — click Refresh apps</option>')+'</select><button class="button ghost" title="Refresh application windows" onclick="refreshSurfaceApps()">↻ Refresh apps</button><button class="button surface" onclick="uploadScreenshot()">⇧ Upload screenshot</button><button class="button surface" onclick="captureScreenshot()">◉ Capture app</button><button class="button surface" title="Open Screen Analyzer modal" onclick="openScreenAnalyzer()">🔍 Screen Analyzer</button><button class="button primary" onclick="analyzeScreenshot()">✦ Analyze</button><span class="analysis-status">'+(surfaceAnalyzing?'Analyzing OCR…':surfaceControls.length?'Screen analyzed · '+surfaceControls.length+' controls':'Screen not analyzed')+'</span></div>';
+    }else{
+      const status=tools.querySelector('.analysis-status');
+      if(status)status.textContent=surfaceAnalyzing?'Analyzing OCR…':surfaceControls.length?'Screen analyzed · '+surfaceControls.length+' controls':'Screen not analyzed';
+    }
   }else{
-    document.getElementById('mode-tools').innerHTML='<div class="pw-tools"><select id="pw-browser-select" aria-label="Browser" title="Select browser to run and inspect (Chrome, Edge, Chromium, Firefox, WebKit)" onchange="selectPwBrowser(this.value)"><option value="chrome"'+(pwBrowserName==='chrome'?' selected':'')+'>🌐 Google Chrome</option><option value="msedge"'+(pwBrowserName==='msedge'?' selected':'')+'>🌐 Microsoft Edge</option><option value="chromium"'+(pwBrowserName==='chromium'?' selected':'')+'>🌐 Chromium</option><option value="firefox"'+(pwBrowserName==='firefox'?' selected':'')+'>🦊 Firefox</option><option value="webkit"'+(pwBrowserName==='webkit'?' selected':'')+'>🧭 WebKit</option></select><input id="pw-url" class="url-input" value="https://practicetestautomation.com/" placeholder="https://site-under-test"><button class="button primary" onclick="navigatePw(false)">↗ Navigate</button><button class="button" onclick="navigatePw(true)">⌕ Navigate + Inspect</button></div>';
+    const current=tools.querySelector('.pw-tools');
+    if(!current){
+      tools.innerHTML='<div class="pw-tools"><select id="pw-browser-select" aria-label="Browser" title="Select browser to run and inspect (Chrome, Edge, Chromium, Firefox, WebKit)" onchange="selectPwBrowser(this.value)"><option value="chrome"'+(pwBrowserName==='chrome'?' selected':'')+'>🌐 Google Chrome</option><option value="msedge"'+(pwBrowserName==='msedge'?' selected':'')+'>🌐 Microsoft Edge</option><option value="chromium"'+(pwBrowserName==='chromium'?' selected':'')+'>🌐 Chromium</option><option value="firefox"'+(pwBrowserName==='firefox'?' selected':'')+'>🦊 Firefox</option><option value="webkit"'+(pwBrowserName==='webkit'?' selected':'')+'>🧭 WebKit</option></select><input id="pw-url" class="url-input" value="https://practicetestautomation.com/" placeholder="https://site-under-test"><button class="button primary" onclick="navigatePw(false)">↗ Navigate</button><button class="button" onclick="navigatePw(true)">⌕ Navigate + Inspect</button></div>';
+    }
   }
 }
 
@@ -3089,9 +3140,46 @@ function analyzeScreenshot(){
 function surfaceOverlayHtml(){return surfaceControls.map(c=>'<div class="analysis-box" data-x="'+c.bbox.x+'" data-y="'+c.bbox.y+'" data-width="'+c.bbox.width+'" data-height="'+c.bbox.height+'" title="'+escapeHtml(c.fullName||c.label)+'"><span>'+escapeHtml(c.controlType+' · '+c.label)+'</span></div>').join('')}
 function positionSurfaceOverlays(imageId){const img=document.getElementById(imageId||'surface-image-inspector'),layer=img&&img.parentElement;if(!img||!layer||!img.naturalWidth)return;const scale=img.clientWidth/img.naturalWidth;layer.querySelectorAll('.analysis-box').forEach(box=>{const x=Number(box.dataset.x||0),y=Number(box.dataset.y||0),width=Number(box.dataset.width||0),height=Number(box.dataset.height||0);box.style.left=(x*scale)+'px';box.style.top=(y*scale)+'px';box.style.width=Math.max(4,width*scale)+'px';box.style.height=Math.max(4,height*scale)+'px'})}
 
-window.beginSelection=function(e){const img=document.getElementById('surface-image-modal')||document.getElementById('surface-image-inspector');if(!img)return;const rect=img.getBoundingClientRect();window.selectionStart={x:e.clientX-rect.left,y:e.clientY-rect.top,rect};e.preventDefault()};
-window.moveSelection=function(e){if(!window.selectionStart)return;const s=window.selectionStart,x=Math.max(0,Math.min(s.rect.width,e.clientX-s.rect.left)),y=Math.max(0,Math.min(s.rect.height,e.clientY-s.rect.top)),l=Math.min(s.x,x),t=Math.min(s.y,y),w=Math.abs(x-s.x),h=Math.abs(y-s.y),box=document.getElementById('selection'),layer=document.querySelector('.surface-analyzer-dialog .surface-image-layer')||document.querySelector('.inspector-screenshot-preview .surface-image-layer'),p=(layer||img).getBoundingClientRect();if(box){box.style.left=(l+s.rect.left-p.left)+'px';box.style.top=(t+s.rect.top-p.top)+'px';box.style.width=w+'px';box.style.height=h+'px'}e.preventDefault()};
-window.endSelection=function(e){if(!window.selectionStart)return;const img=document.getElementById('surface-image-modal')||document.getElementById('surface-image-inspector');if(!img)return;const s=window.selectionStart,rect=img.getBoundingClientRect(),x=Math.max(0,Math.min(rect.width,e.clientX-rect.left)),y=Math.max(0,Math.min(rect.height,e.clientY-rect.top)),l=Math.min(s.x,x),t=Math.min(s.y,y),w=Math.abs(x-s.x),h=Math.abs(y-s.y);if(w>5&&h>5)surfaceSelection={x:Math.round(l*(img.naturalWidth/rect.width)),y:Math.round(t*(img.naturalHeight/rect.height)),width:Math.round(w*(img.naturalWidth/rect.width)),height:Math.round(h*(img.naturalHeight/rect.height))};window.selectionStart=null;showToast(surfaceSelection?'Region selected — click Analyze screenshot':'Select a larger region')};
+window.onerror=function(msg,url,line,col,err){
+  console.warn('FlowBuilder UI error caught:', msg, err);
+  return true;
+};
+
+window.beginSelection=function(e){
+  const img=document.getElementById('surface-image-modal')||document.getElementById('surface-image-inspector');
+  if(!img)return;
+  const rect=img.getBoundingClientRect();
+  window.selectionStart={x:e.clientX-rect.left,y:e.clientY-rect.top,rect};
+  e.preventDefault();
+};
+window.moveSelection=function(e){
+  if(!window.selectionStart)return;
+  const s=window.selectionStart;
+  const x=Math.max(0,Math.min(s.rect.width,e.clientX-s.rect.left));
+  const y=Math.max(0,Math.min(s.rect.height,e.clientY-s.rect.top));
+  const l=Math.min(s.x,x),t=Math.min(s.y,y),w=Math.abs(x-s.x),h=Math.abs(y-s.y);
+  const box=document.getElementById('selection');
+  const img=document.getElementById('surface-image-modal')||document.getElementById('surface-image-inspector');
+  const layer=document.querySelector('.surface-analyzer-dialog .surface-image-layer')||document.querySelector('.inspector-screenshot-preview .surface-image-layer');
+  const targetEl=layer||img;
+  const p=targetEl?targetEl.getBoundingClientRect():{left:0,top:0};
+  if(box){box.style.left=(l+s.rect.left-p.left)+'px';box.style.top=(t+s.rect.top-p.top)+'px';box.style.width=w+'px';box.style.height=h+'px'}
+  e.preventDefault();
+};
+window.endSelection=function(e){
+  if(!window.selectionStart)return;
+  const img=document.getElementById('surface-image-modal')||document.getElementById('surface-image-inspector');
+  if(!img)return;
+  const s=window.selectionStart,rect=img.getBoundingClientRect();
+  const x=Math.max(0,Math.min(rect.width,e.clientX-rect.left));
+  const y=Math.max(0,Math.min(rect.height,e.clientY-rect.top));
+  const l=Math.min(s.x,x),t=Math.min(s.y,y),w=Math.abs(x-s.x),h=Math.abs(y-s.y);
+  if(w>5&&h>5&&img.naturalWidth&&rect.width){
+    surfaceSelection={x:Math.round(l*(img.naturalWidth/rect.width)),y:Math.round(t*(img.naturalHeight/rect.height)),width:Math.round(w*(img.naturalWidth/rect.width)),height:Math.round(h*(img.naturalHeight/rect.height))};
+  }
+  window.selectionStart=null;
+  showToast(surfaceSelection?'Region selected — click Analyze screenshot':'Select a larger region');
+};
 
 function selectPwBrowser(browser){
   pwBrowserName=browser;
