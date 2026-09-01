@@ -115,15 +115,6 @@ export class InspectorWebview {
           break;
         case 'action:stop':
           await session.stop();
-          vscode.commands.executeCommand('automationStudio.recorder.stop');
-          break;
-        case 'action:pause':
-          await session.pause();
-          vscode.commands.executeCommand('automationStudio.recorder.pause');
-          break;
-        case 'action:resume':
-          await session.resume();
-          vscode.commands.executeCommand('automationStudio.recorder.start');
           break;
         case 'action:refresh':
           await session.refresh();
@@ -134,24 +125,11 @@ export class InspectorWebview {
             vscode.window.showTextDocument(doc);
           });
           break;
-        case 'action:record':
-          await vscode.commands.executeCommand('automationStudio.recorder.start');
-          panel.webview.postMessage({ command: 'recordingStarted' });
-          break;
-        case 'action:pauseRecord':
-          await vscode.commands.executeCommand('automationStudio.recorder.pause');
-          panel.webview.postMessage({ command: 'recordingPaused' });
-          break;
-        case 'action:stopRecord':
-          await vscode.commands.executeCommand('automationStudio.recorder.stop');
-          panel.webview.postMessage({ command: 'recordingStopped' });
-          break;
       }
     });
 
     panel.onDidDispose(() => {
       session.stop();
-      vscode.commands.executeCommand('automationStudio.recorder.stop');
     });
   }
 
@@ -185,12 +163,9 @@ export class InspectorWebview {
   </div>
 
   <div class="toolbar">
-    <button id="record-btn" onclick="sendCommand('action:record')" style="background: var(--vscode-charts-red); color: white;">● Record</button>
-    <button onclick="sendCommand('action:pause')">Pause</button>
-    <button onclick="sendCommand('action:resume')">Resume</button>
     <button onclick="sendCommand('action:refresh')">Refresh</button>
     <button onclick="sendCommand('action:exportDom')">DOM</button>
-    <button onclick="sendCommand('action:stop')">Stop</button>
+    <button onclick="sendCommand('action:stop')">Close</button>
   </div>
 
   <div class="card">

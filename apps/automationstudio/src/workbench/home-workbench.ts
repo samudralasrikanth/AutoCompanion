@@ -483,28 +483,6 @@ export class HomeWorkbench {
     }
   }
 
-  function startRecording(tech) {
-    const projectSelect = document.getElementById('project-select');
-    const scenarioSelect = document.getElementById('scenario-select');
-    const newNameInput = document.getElementById('new-scenario-name');
-
-    const projectPath = projectSelect ? projectSelect.value : '';
-    const scenarioId = scenarioSelect ? scenarioSelect.value : 'new';
-    const newName = newNameInput ? newNameInput.value.trim() : '';
-
-    const startOptions = {
-      projectPath: projectPath,
-      scenarioId: scenarioId === 'new' ? null : scenarioId,
-      scenarioName: scenarioId === 'new' ? (newName || 'New Recorded Scenario') : scenarioSelect.options[scenarioSelect.selectedIndex].text
-    };
-
-    vscode.postMessage({
-      command: 'executeAction',
-      actionId: 'automationStudio.recorder.start',
-      args: [tech, startOptions]
-    });
-  }
-
   function openFlowBuilder(mode) {
     const projectSelect = document.getElementById('project-select');
     const scenarioSelect = document.getElementById('scenario-select');
@@ -560,13 +538,9 @@ export class HomeWorkbench {
             </div>
 
             <div class="flex gap-4 pt-6 border-t border-white/5">
-              <button onclick="startRecording('vision')" class="flex items-center gap-2 px-6 py-2.5 bg-gradient-to-r from-red-500/20 to-red-600/20 hover:from-red-500/30 hover:to-red-600/30 text-red-400 font-bold border border-red-500/30 rounded-lg text-xs transition-all">
-                <span class="material-symbols-outlined text-red-500 text-base">fiber_manual_record</span>
-                Start Vision Recorder
-              </button>
               <button onclick="openFlowBuilder('surface')" class="flex items-center gap-2 px-6 py-2.5 bg-primary/10 hover:bg-primary/20 text-primary font-bold border border-primary/30 rounded-lg text-xs transition-all">
                 <span class="material-symbols-outlined text-primary text-base">account_tree</span>
-                Open Automation Studio Builder
+                Open Surface Flow Builder
               </button>
               <button onclick="executeAction('automationStudio.startInspector')" class="flex items-center gap-2 px-6 py-2.5 bg-white/5 hover:bg-white/10 text-on-surface border border-white/10 rounded-lg text-xs transition-all">
                 <span class="material-symbols-outlined text-primary text-base">pageview</span>
@@ -599,7 +573,7 @@ export class HomeWorkbench {
               <div class="bg-black/20 p-5 rounded-xl border border-white/5 space-y-2">
                 <span class="material-symbols-outlined text-secondary text-xl">keyboard</span>
                 <h4 class="font-bold text-sm">Keyboard Hooks</h4>
-                <p class="text-[11px] text-on-surface/50">Record native hardware input and shortcuts at the OS level.</p>
+                <p class="text-[11px] text-on-surface/50">Interact with native hardware input and shortcuts at the OS level.</p>
               </div>
               <div class="bg-black/20 p-5 rounded-xl border border-white/5 space-y-2">
                 <span class="material-symbols-outlined text-secondary text-xl">window</span>
@@ -614,9 +588,9 @@ export class HomeWorkbench {
             </div>
 
             <div class="flex gap-4 pt-6 border-t border-white/5">
-              <button onclick="startRecording('vision')" class="flex items-center gap-2 px-6 py-2.5 bg-gradient-to-r from-red-500/20 to-red-600/20 hover:from-red-500/30 hover:to-red-600/30 text-red-400 font-bold border border-red-500/30 rounded-lg text-xs transition-all">
-                <span class="material-symbols-outlined text-red-500 text-base">fiber_manual_record</span>
-                Start Desktop Recorder
+              <button onclick="openFlowBuilder('surface')" class="flex items-center gap-2 px-6 py-2.5 bg-secondary/10 hover:bg-secondary/20 text-secondary font-bold border border-secondary/30 rounded-lg text-xs transition-all">
+                <span class="material-symbols-outlined text-secondary text-base">account_tree</span>
+                Open Surface Flow Builder
               </button>
             </div>
           </div>
@@ -655,13 +629,9 @@ export class HomeWorkbench {
             </div>
 
             <div class="flex gap-4 pt-6 border-t border-white/5">
-              <button onclick="startRecording('playwright')" class="flex items-center gap-2 px-6 py-2.5 bg-gradient-to-r from-red-500/20 to-red-600/20 hover:from-red-500/30 hover:to-red-600/30 text-red-400 font-bold border border-red-500/30 rounded-lg text-xs transition-all">
-                <span class="material-symbols-outlined text-red-500 text-base">fiber_manual_record</span>
-                Start PW Recorder
-              </button>
               <button onclick="openFlowBuilder('pw')" class="flex items-center gap-2 px-6 py-2.5 bg-surface-tint/10 hover:bg-surface-tint/20 text-surface-tint font-bold border border-surface-tint/30 rounded-lg text-xs transition-all">
                 <span class="material-symbols-outlined text-surface-tint text-base">account_tree</span>
-                Open Automation Studio Builder
+                Open PW Flow Builder
               </button>
             </div>
           </div>

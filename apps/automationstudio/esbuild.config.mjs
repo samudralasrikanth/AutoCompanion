@@ -6,7 +6,7 @@ const buildOptions = {
   entryPoints: ['src/extension.ts'],
   bundle: true,
   outfile: 'dist/extension.js',
-  external: ['vscode', 'playwright-core', 'fsevents', 'chromium-bidi/*', 'uiohook-napi', 'screenshot-desktop', 'tesseract.js'],
+  external: ['vscode', 'playwright-core', 'fsevents', 'chromium-bidi/*', 'screenshot-desktop', 'tesseract.js'],
   format: 'cjs',
   platform: 'node',
   target: 'node22',

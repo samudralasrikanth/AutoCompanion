@@ -2,7 +2,7 @@
   "name": "automation-studio",
   "displayName": "Automation Studio",
   "description": "Visual web and Surface test automation with shared Playwright libraries, code generation, repeatable runs, and embedded HTML reports",
-  "icon": "assets/record-button.png",
+  "icon": "assets/logo.png",
   "version": "0.2.11",
   "publisher": "automationstudio",
   "license": "UNLICENSED",
@@ -563,12 +563,6 @@
         "icon": "$(refresh)"
       },
       {
-        "command": "automationStudio.recorder.generate",
-        "title": "Generate Script",
-        "category": "Automation Studio",
-        "icon": "$(hubot)"
-      },
-      {
         "command": "automationStudio.dashboard.show",
         "title": "Open Dashboard",
         "category": "Automation Studio",
@@ -595,36 +589,6 @@
         "command": "automationStudio.createPlugin",
         "title": "Create Plugin",
         "category": "Automation Studio"
-      },
-      {
-        "command": "automationStudio.recorder.start",
-        "title": "Start Recording",
-        "category": "Automation Studio",
-        "icon": "$(record)"
-      },
-      {
-        "command": "automationStudio.recorder.pause",
-        "title": "Pause Recording",
-        "category": "Automation Studio",
-        "icon": "$(debug-pause)"
-      },
-      {
-        "command": "automationStudio.recorder.resume",
-        "title": "Resume Recording",
-        "category": "Automation Studio",
-        "icon": "$(play)"
-      },
-      {
-        "command": "automationStudio.recorder.stop",
-        "title": "Stop Recording",
-        "category": "Automation Studio",
-        "icon": "$(primitive-square)"
-      },
-      {
-        "command": "automationStudio.recorder.cancel",
-        "title": "Cancel Recording",
-        "category": "Automation Studio",
-        "icon": "$(discard)"
       },
       {
         "command": "automationStudio.bitwarden.fetchCredentials",
@@ -721,26 +685,6 @@
           "command": "automationStudio.settings.open",
           "when": "view == automationStudio.projectExplorer",
           "group": "navigation@4"
-        },
-        {
-          "command": "automationStudio.recorder.start",
-          "when": "view == automationStudio.projectExplorer && automationStudio.recordingState != recording && automationStudio.recordingState != paused",
-          "group": "navigation@4"
-        },
-        {
-          "command": "automationStudio.recorder.pause",
-          "when": "view == automationStudio.projectExplorer && automationStudio.recordingState == recording",
-          "group": "navigation@5"
-        },
-        {
-          "command": "automationStudio.recorder.resume",
-          "when": "view == automationStudio.projectExplorer && automationStudio.recordingState == paused",
-          "group": "navigation@6"
-        },
-        {
-          "command": "automationStudio.recorder.stop",
-          "when": "view == automationStudio.projectExplorer && (automationStudio.recordingState == recording || automationStudio.recordingState == paused)",
-          "group": "navigation@7"
         }
       ]
     },
@@ -761,14 +705,14 @@
         {
           "id": "automation-studio-explorer",
           "title": "Automation Studio",
-          "icon": "assets/record-button.png"
+          "icon": "assets/sidebar-icon-v2.svg"
         }
       ],
       "panel": [
         {
           "id": "automationStudio",
           "title": "Automation Studio",
-          "icon": "assets/record-button.png"
+          "icon": "assets/sidebar-icon-v2.svg"
         }
       ]
     },
@@ -864,11 +808,6 @@
           "default": "info",
           "description": "Logging level"
         },
-        "automationStudio.recorder.captureScreenshots": {
-          "type": "boolean",
-          "default": true,
-          "description": "Capture screenshots during recording"
-        },
         "automationStudio.report.autoOpen": {
           "type": "boolean",
           "default": true,
@@ -904,8 +843,7 @@
   "dependencies": {
     "playwright-core": "^1.45.0",
     "screenshot-desktop": "^1.15.0",
-    "tesseract.js": "^5.0.5",
-    "uiohook-napi": "^1.5.5"
+    "tesseract.js": "^5.0.5"
   },
   "devDependencies": {
     "@anthropic-ai/sdk": ">=0.0.0",

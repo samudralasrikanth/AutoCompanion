@@ -32,7 +32,6 @@ import { FrameworkManagerWebview } from '../workbench/framework-manager-webview'
 import { ConsoleWebviewViewProvider } from '../workbench/console-webview';
 import { createProjectCommands } from '../commands/project-commands';
 import { createPlatformCommands } from '../commands/platform-commands';
-import { createRecorderCommands } from '../commands/recorder-commands';
 import { createDoctorCommands } from '../commands/doctor-commands';
 import { registerRunCommands } from '../commands/run-commands';
 import { registerReportCommands } from '../commands/report-commands';
@@ -346,13 +345,11 @@ export async function bootstrap(context: vscode.ExtensionContext): Promise<Boots
     const platformCommands = createPlatformCommands(provider, context, outputChannel);
     const projectCommands = createProjectCommands(provider);
     const doctorCommands = createDoctorCommands(provider, outputChannel);
-    const recorderCommands = createRecorderCommands(provider);
 
     const commandRegistration = commandRegistry.registerMany([
       ...platformCommands,
       ...projectCommands,
-      ...doctorCommands,
-      ...recorderCommands
+      ...doctorCommands
     ]);
     context.subscriptions.push({ dispose: () => commandRegistration.dispose() });
     stopwatch.lap('Phase 6: Commands registered');
@@ -391,7 +388,6 @@ export async function bootstrap(context: vscode.ExtensionContext): Promise<Boots
     const projectStatus = workbenchStatusService.registerStatusItem('automationStudio.status.project', 'left', 100);
     const envStatus = workbenchStatusService.registerStatusItem('automationStudio.status.env', 'left', 99);
     const aiStatus = workbenchStatusService.registerStatusItem('automationStudio.status.ai', 'left', 98);
-    const recorderStatus = workbenchStatusService.registerStatusItem('automationStudio.status.recorder', 'left', 97);
     
     // Status Bar behavior
     const updateProjectStatus = () => {
@@ -418,30 +414,6 @@ export async function bootstrap(context: vscode.ExtensionContext): Promise<Boots
     updateEnvStatus(); // Initial call
 
     workbenchStatusService.updateStatus('automationStudio.status.ai', '$(hubot) AI', 'AI Ready');
-    const recorderStatusId = 'automationStudio.status.recorder';
-    const recorderStopStatusId = 'automationStudio.status.recorder.stop';
-    workbenchStatusService.updateStatus(recorderStatusId, '$(record-keys) Record', 'Start Recording', 'automationStudio.recorder.start');
-    workbenchStatusService.registerStatusItem(recorderStopStatusId, 'left', 96);
-    
-    eventBus.subscribe('Recorder.RecordingStarted', () => {
-      workbenchStatusService.updateStatus(recorderStatusId, '$(circle-filled) Recording...', 'Click to Pause', 'automationStudio.recorder.pause');
-      workbenchStatusService.updateStatus(recorderStopStatusId, '$(square-active) Stop', 'Stop & Generate Scenario', 'automationStudio.recorder.stop');
-    });
-
-    eventBus.subscribe('Recorder.RecordingPaused', () => {
-      workbenchStatusService.updateStatus(recorderStatusId, '$(debug-pause) Paused', 'Click to Resume', 'automationStudio.recorder.resume');
-      workbenchStatusService.updateStatus(recorderStopStatusId, '$(square-active) Stop', 'Stop & Generate Scenario', 'automationStudio.recorder.stop');
-    });
-
-    eventBus.subscribe('Recorder.RecordingStopped', () => {
-      workbenchStatusService.updateStatus(recorderStatusId, '$(record-keys) Record', 'Start Recording', 'automationStudio.recorder.start');
-      workbenchStatusService.updateStatus(recorderStopStatusId, '', '');
-    });
-
-    eventBus.subscribe('Recorder.RecordingCancelled', () => {
-      workbenchStatusService.updateStatus(recorderStatusId, '$(record-keys) Record', 'Start Recording', 'automationStudio.recorder.start');
-      workbenchStatusService.updateStatus(recorderStopStatusId, '', '');
-    });
 
     const executionStatusId = 'automationStudio.status.execution';
     workbenchStatusService.registerStatusItem(executionStatusId, 'left', 101);
