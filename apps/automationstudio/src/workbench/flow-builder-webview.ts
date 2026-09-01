@@ -228,7 +228,7 @@ export class FlowBuilderWebview {
         case 'loadReusableActions': await this.sendReusableActions(); break;
         case 'deleteReusableAction': await this.deleteReusableAction(String(message.name || '')); break;
         case 'importCsvSteps': await this.importCsvSteps(); break;
-        case 'exportControlsCsv': await this.exportControlsCsv(); break;
+        case 'exportControlsCsv': await this.exportControlsCsv(Boolean(message.openInEditor)); break;
       }
     } catch (error) {
       const text = error instanceof Error ? error.message : String(error);
@@ -676,7 +676,7 @@ export class FlowBuilderWebview {
     vscode.window.showInformationMessage(`Imported ${steps.length} step${steps.length === 1 ? '' : 's'} from ${path.basename(filePath)}${scCountMsg}.`);
   }
 
-  private async exportControlsCsv(): Promise<void> {
+  private async exportControlsCsv(openInEditor: boolean = false): Promise<void> {
     const projectPath = this.getBuilderProjectPath();
     if (!projectPath) {
       vscode.window.showWarningMessage('Open a project before exporting or viewing controls.csv.');
@@ -687,9 +687,47 @@ export class FlowBuilderWebview {
       vscode.window.showInformationMessage('No controls have been cataloged yet. Upload and analyze a screenshot to detect controls.');
       return;
     }
-    const doc = await vscode.workspace.openTextDocument(csvPath);
-    await vscode.window.showTextDocument(doc);
-    vscode.window.showInformationMessage(`Opened project controls catalog: ${path.basename(csvPath)}`);
+    try {
+      const content = fs.readFileSync(csvPath, 'utf8');
+      const lines = content.split(/\r?\n/).filter(line => line.trim().length > 0);
+      const rows = lines.map(line => {
+        const parts: string[] = [];
+        let cur = '';
+        let inQuote = false;
+        for (let i = 0; i < line.length; i++) {
+          const ch = line[i];
+          if (ch === '"') inQuote = !inQuote;
+          else if (ch === ',' && !inQuote) {
+            parts.push(cur);
+            cur = '';
+          } else {
+            cur += ch;
+          }
+        }
+        parts.push(cur);
+        return parts.map(p => p.replace(/^"|"$/g, '').trim());
+      });
+
+      await this.panel?.postMessage({
+        type: 'controlsCsvLoaded',
+        content,
+        rows,
+        filePath: csvPath,
+        fileName: path.basename(csvPath)
+      });
+
+      if (openInEditor) {
+        const doc = await vscode.workspace.openTextDocument(csvPath);
+        await vscode.window.showTextDocument(doc, {
+          viewColumn: vscode.ViewColumn.Beside,
+          preview: false,
+          preserveFocus: true
+        });
+        vscode.window.showInformationMessage(`Opened project controls catalog beside: ${path.basename(csvPath)}`);
+      }
+    } catch (e) {
+      vscode.window.showErrorMessage(`Failed to open controls.csv: ${e instanceof Error ? e.message : String(e)}`);
+    }
   }
 
   private getProjectRoots(): string[] {
@@ -2375,7 +2413,15 @@ export class FlowBuilderWebview {
 .examples-table .row-del-btn{background:transparent;border:0;color:#ff7180;cursor:pointer;font-size:11px;padding:2px 5px}
 .examples-table .row-del-btn:hover{background:#ff4d4f33;border-radius:3px}
 .examples-table .col-del-btn{background:transparent;border:0;color:#ff7180;cursor:pointer;font-size:9px;margin-left:4px}
-.surface-image-layer{position:relative;display:inline-block;max-width:100%;max-height:270px;line-height:0}.surface-image-layer img{display:block;max-width:100%;max-height:270px;user-select:none}.surface-overlays{position:absolute;inset:0;pointer-events:none}.analysis-box{position:absolute;border:2px solid #ffbf69;background:#ffbf6926;line-height:normal;z-index:2}.analysis-box span{position:absolute;left:-2px;bottom:100%;padding:3px 5px;border-radius:3px 3px 0 0;background:#ffbf69;color:#17100a;white-space:nowrap;font-size:10px;font-weight:700}.topbar,.subbar{min-width:0;overflow-x:auto}.topbar>.brand,.topbar>.top-actions,.subbar>.toolbar,.subbar>#mode-tools,.subbar>.tabs{flex:0 0 auto}.surface-tools,.pw-tools{flex-wrap:wrap}.workspace{grid-template-columns:255px minmax(440px,1fr) 6px minmax(260px,320px)}.inspector-resizer{cursor:col-resize;background:#1d2a35;border-left:1px solid #314454;border-right:1px solid #314454}.inspector-resizer:hover{background:#4db2ff}.inspector-screenshot-panel{padding:12px 0;border-bottom:1px solid var(--line)}.inspector-screenshot-head{display:flex;align-items:center;justify-content:space-between;margin-bottom:8px}.inspector-screenshot-preview{position:relative;min-height:100px;max-height:210px;display:grid;place-items:center;overflow:hidden;border:1px dashed #665b98;border-radius:5px;background:#0d1117}.inspector-screenshot-preview .surface-image-layer,.inspector-screenshot-preview .surface-image-layer img{max-height:200px}.step-shot{position:relative;margin-top:7px;padding:6px;border:1px solid var(--line);border-radius:4px;background:#151f28}.step-shot img{display:block;width:100%;max-height:100px;object-fit:contain}.step-shot button{position:absolute;top:4px;right:4px}.sequence-data{display:block;width:100%;margin-top:6px;padding:6px;border:1px solid #405363;border-radius:4px;color:var(--text);background:#0d141b}.analysis-status{padding:5px 8px;border:1px solid #4b4277;border-radius:5px;color:#cfc3ff;background:#211b3d;white-space:nowrap;font-size:10px}.surface-analyzer-modal{position:fixed;inset:0;z-index:30;display:grid;place-items:center;padding:18px;background:#05080dcc}.surface-analyzer-dialog{width:min(1180px,96vw);height:min(820px,94vh);display:grid;grid-template-rows:auto minmax(0,1fr) auto;overflow:hidden;border:1px solid #665b98;border-radius:10px;background:#111820;box-shadow:0 24px 80px #000b}.surface-analyzer-head,.surface-analyzer-foot{display:flex;align-items:center;gap:9px;padding:12px 15px;border-bottom:1px solid #2a3947}.surface-analyzer-head strong{font-size:14px}.surface-analyzer-head .hint{margin-left:auto}.surface-analyzer-body{display:grid;grid-template-columns:minmax(0,1fr) 340px;min-height:0}.surface-analyzer-image{display:grid;place-items:center;overflow:auto;padding:14px;background:#0b1016}.surface-analyzer-image .surface-image-layer{max-width:100%;max-height:100%}.surface-analyzer-image .surface-image-layer img{max-width:100%;max-height:68vh}.surface-analyzer-image .analysis-box span{display:none}.surface-analyzer-controls{min-width:0;overflow:auto;padding:12px;border-left:1px solid #2a3947}.surface-analyzer-controls .section-heading{margin-bottom:8px}.analyzer-control{display:flex;align-items:flex-start;gap:8px;margin:6px 0;padding:8px;border:1px solid #2a3947;border-radius:5px;background:#151f28;cursor:pointer}.analyzer-control.selected{border-color:#c09cff;background:#282044}.analyzer-control input{margin-top:2px}.analyzer-control-label{min-width:0;flex:1}.analyzer-control-label strong{display:block;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.analyzer-control-meta{margin-top:3px;color:#8a9aa8;font:10px ui-monospace,monospace}.surface-analyzer-foot{justify-content:flex-end;border-top:1px solid #2a3947;border-bottom:0}.surface-analyzer-foot .hint{margin-right:auto}.surface-analyzer-foot .button{white-space:nowrap}@media(max-width:850px){.surface-analyzer-body{grid-template-columns:1fr}.surface-analyzer-controls{max-height:240px;border-top:1px solid #2a3947;border-left:0}.surface-analyzer-dialog{height:94vh}}
+.surface-image-layer{position:relative;display:inline-block;max-width:100%;max-height:270px;line-height:0}.surface-image-layer img{display:block;max-width:100%;max-height:270px;user-select:none}.surface-overlays{position:absolute;inset:0;pointer-events:none}.analysis-box{position:absolute;border:2px solid #ffbf69;background:#ffbf6926;line-height:normal;z-index:2}.analysis-box span{position:absolute;left:-2px;bottom:100%;padding:3px 5px;border-radius:3px 3px 0 0;background:#ffbf69;color:#17100a;white-space:nowrap;font-size:10px;font-weight:700}.topbar,.subbar{min-width:0;overflow-x:auto}.topbar>.brand,.topbar>.top-actions,.subbar>.toolbar,.subbar>#mode-tools,.subbar>.tabs{flex:0 0 auto}.surface-tools,.pw-tools{flex-wrap:wrap}.workspace{grid-template-columns:255px minmax(440px,1fr) 6px minmax(260px,320px)}.inspector-resizer{cursor:col-resize;background:#1d2a35;border-left:1px solid #314454;border-right:1px solid #314454}.inspector-resizer:hover{background:#4db2ff}.inspector-screenshot-panel{padding:12px 0;border-bottom:1px solid var(--line)}.inspector-screenshot-head{display:flex;align-items:center;justify-content:space-between;margin-bottom:8px}.inspector-screenshot-preview{position:relative;min-height:100px;max-height:210px;display:grid;place-items:center;overflow:hidden;border:1px dashed #665b98;border-radius:5px;background:#0d1117}.inspector-screenshot-preview .surface-image-layer,.inspector-screenshot-preview .surface-image-layer img{max-height:200px}.step-shot{position:relative;margin-top:7px;padding:6px;border:1px solid var(--line);border-radius:4px;background:#151f28}.step-shot img{display:block;width:100%;max-height:100px;object-fit:contain}.step-shot button{position:absolute;top:4px;right:4px}.sequence-data{display:block;width:100%;margin-top:6px;padding:6px;border:1px solid #405363;border-radius:4px;color:var(--text);background:#0d141b}.analysis-status{padding:5px 8px;border:1px solid #4b4277;border-radius:5px;color:#cfc3ff;background:#211b3d;white-space:nowrap;font-size:10px}.surface-analyzer-modal{position:fixed;inset:0;z-index:30;display:grid;place-items:center;padding:18px;background:#05080dcc}.surface-analyzer-dialog{width:min(1180px,96vw);height:min(820px,94vh);display:grid;grid-template-rows:auto minmax(0,1fr) auto;overflow:hidden;border:1px solid #665b98;border-radius:10px;background:#111820;box-shadow:0 24px 80px #000b}.surface-analyzer-head,.surface-analyzer-foot{display:flex;align-items:center;gap:9px;padding:12px 15px;border-bottom:1px solid #2a3947}.surface-analyzer-head strong{font-size:14px}.surface-analyzer-head .hint{margin-left:auto}.surface-analyzer-body{display:grid;grid-template-columns:minmax(0,1fr) 340px;min-height:0}.surface-analyzer-image{display:grid;place-items:center;overflow:auto;padding:14px;background:#0b1016}.surface-analyzer-image .surface-image-layer{max-width:100%;max-height:100%}.surface-analyzer-image .surface-image-layer img{max-width:100%;max-height:68vh}.surface-analyzer-image .analysis-box span{display:none}.surface-analyzer-controls{min-width:0;overflow:auto;padding:12px;border-left:1px solid #2a3947}.surface-analyzer-controls .section-heading{margin-bottom:8px}.analyzer-control{display:flex;align-items:flex-start;gap:8px;margin:6px 0;padding:8px;border:1px solid #2a3947;border-radius:5px;background:#151f28;cursor:pointer}.analyzer-control.selected{border-color:#c09cff;background:#282044}.analyzer-control input{margin-top:2px}.analyzer-control-label{min-width:0;flex:1}.analyzer-control-label strong{display:block;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.analyzer-control-meta{margin-top:3px;color:#8a9aa8;font:10px ui-monospace,monospace}.surface-analyzer-foot{justify-content:flex-end;border-top:1px solid #2a3947;border-bottom:0}.surface-analyzer-foot .hint{margin-right:auto}.surface-analyzer-foot .button{white-space:nowrap}
+.controls-csv-modal{position:fixed;inset:0;z-index:40;display:grid;place-items:center;padding:18px;background:#05080de6}
+.controls-csv-dialog{width:min(1040px,94vw);max-height:86vh;display:grid;grid-template-rows:auto auto minmax(0,1fr) auto;overflow:hidden;border:1px solid #4db2ff;border-radius:10px;background:#111820;box-shadow:0 24px 80px #000c}
+.controls-table-wrap{overflow:auto;padding:10px;min-height:140px;background:#0b1016}
+.controls-csv-table{border-collapse:collapse;width:100%;font-size:11px;background:#141e28}
+.controls-csv-table th,.controls-csv-table td{border:1px solid #283a4c;padding:6px 9px;text-align:left}
+.controls-csv-table th{background:#182635;color:#85a5c2;font-weight:700;position:sticky;top:0;z-index:1}
+.controls-csv-table tr:hover{background:#1d2d3d}
+@media(max-width:850px){.surface-analyzer-body{grid-template-columns:1fr}.surface-analyzer-controls{max-height:240px;border-top:1px solid #2a3947;border-left:0}.surface-analyzer-dialog{height:94vh}}
 </style></head>
 <body><div class="shell">
 <header class="topbar"><div class="brand"><div class="mark">●</div><div><span class="title">Automation Studio Builder</span><span class="crumb">/ ${builderProjectPath ? 'Selected project' : 'Choose a project'}</span></div></div><div class="top-actions"><span class="mode-pill">BUILDER</span><span id="mode-pill" class="mode-pill">PW</span><button class="button" title="Import steps directly from CSV" onclick="importCsvSteps()">📥 Import CSV</button><button class="button" onclick="newFlow()">＋ New Script</button><button class="button primary" onclick="saveFlow()">Save</button><button class="button" onclick="runFlow()">▶ Run in order</button></div></header>
@@ -3751,8 +3797,55 @@ window.addEventListener('message',e=>{
     showToast('Imported '+(m.steps||[]).length+' steps from '+(m.fileName||'CSV')+(m.scenarios&&m.scenarios.length>1?' across '+m.scenarios.length+' scenarios':' into flow'));
   }else if(m.type==='executionFinished'){
     showToast(m.status==='passed'?'Execution completed':'Execution stopped: '+(m.message||'step failed'));
+  }else if(m.type==='controlsCsvLoaded'){
+    renderControlsCsvModal(m);
   }
 });
+
+let controlsCsvData=null;
+let controlsCsvFilter='';
+
+function renderControlsCsvModal(data){
+  controlsCsvData=data||controlsCsvData;
+  if(!controlsCsvData)return;
+  let modal=document.getElementById('controls-csv-modal');
+  if(!modal){
+    modal=document.createElement('div');
+    modal.id='controls-csv-modal';
+    modal.className='controls-csv-modal';
+    modal.onclick=(e)=>{if(e.target===modal)closeControlsCsvModal();};
+    document.body.appendChild(modal);
+  }
+  const rows=controlsCsvData.rows||[];
+  const header=rows[0]||['windowName','controlName','controlType','confidence','x','y','width','height','label'];
+  const bodyRows=rows.slice(1);
+  const q=controlsCsvFilter.toLowerCase().trim();
+  const filtered=q?bodyRows.filter(r=>r.some(c=>String(c).toLowerCase().includes(q))):bodyRows;
+
+  const headerHtml='<tr><th style="width:36px">#</th>'+header.map(h=>'<th>'+escapeHtml(h)+'</th>').join('')+'</tr>';
+  const bodyHtml=filtered.length?filtered.map((r,i)=>'<tr><td style="color:#8a9aa8">'+(i+1)+'</td>'+r.map(c=>'<td>'+escapeHtml(c)+'</td>').join('')+'</tr>').join(''):'<tr><td colspan="'+(header.length+1)+'" style="text-align:center;padding:18px;color:#8a9aa8">No matching controls found</td></tr>';
+
+  modal.innerHTML='<div class="controls-csv-dialog" role="dialog" aria-modal="true">'+
+    '<div class="surface-analyzer-head"><strong>📄 '+escapeHtml(controlsCsvData.fileName||'controls.csv')+'</strong>'+
+    '<span class="hint">'+bodyRows.length+' controls in catalog</span>'+
+    '<button class="button surface" title="Open CSV side-by-side in VS Code editor" onclick="openControlsCsvInEditor()">↗ Open in Editor (Beside)</button>'+
+    '<button class="button" onclick="closeControlsCsvModal()">✕ Close</button></div>'+
+    '<div style="padding:10px 14px;background:#0d141c;border-bottom:1px solid #283a4c;display:flex;gap:10px;align-items:center">'+
+    '<input type="text" placeholder="Filter controls by window, name, type, or label…" value="'+escapeHtml(controlsCsvFilter)+'" oninput="controlsCsvFilter=this.value;renderControlsCsvModal()" style="flex:1;padding:6px 10px;border:1px solid #334455;border-radius:4px;background:#151f28;color:#fff;font-size:11px">'+
+    '<span class="hint" style="white-space:nowrap">'+filtered.length+' of '+bodyRows.length+' controls</span></div>'+
+    '<div class="controls-table-wrap"><table class="controls-csv-table"><thead>'+headerHtml+'</thead><tbody>'+bodyHtml+'</tbody></table></div>'+
+    '<div class="surface-analyzer-foot"><span class="hint">'+escapeHtml(controlsCsvData.filePath||'')+'</span><button class="button primary" onclick="closeControlsCsvModal()">Done</button></div></div>';
+  modal.style.display='grid';
+}
+
+function closeControlsCsvModal(){
+  const modal=document.getElementById('controls-csv-modal');
+  if(modal)modal.style.display='none';
+}
+
+function openControlsCsvInEditor(){
+  vscode.postMessage({command:'exportControlsCsv',openInEditor:true});
+}
 
 function importCsvSteps(){
   vscode.postMessage({command:'importCsvSteps'});
