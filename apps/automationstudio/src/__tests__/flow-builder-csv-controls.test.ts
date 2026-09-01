@@ -208,5 +208,37 @@ describe('Flow Builder CSV Controls & Import Flow Steps', () => {
     expect(scenarioMap.get('Scenario 1: Login')).toHaveLength(3);
     expect(scenarioMap.get('Scenario 2: Logout')).toHaveLength(1);
   });
+
+  it('correctly parses raw controls.csv rows and columns for modal view', () => {
+    const csvContent = [
+      'id,window,control,fullName,type,strategy,locator,x,y,width,height',
+      'Calc.Btn7,Calc,Btn7,Calc.Btn7,button,ocr,"7",10,20,40,30',
+      'Calc.Btn8,Calc,Btn8,Calc.Btn8,button,ocr,"8",55,20,40,30',
+    ].join('\n');
+
+    const lines = csvContent.split(/\r?\n/).filter(line => line.trim().length > 0);
+    const rows = lines.map(line => {
+      const parts: string[] = [];
+      let cur = '';
+      let inQuote = false;
+      for (let i = 0; i < line.length; i++) {
+        const ch = line[i];
+        if (ch === '"') inQuote = !inQuote;
+        else if (ch === ',' && !inQuote) {
+          parts.push(cur);
+          cur = '';
+        } else {
+          cur += ch;
+        }
+      }
+      parts.push(cur);
+      return parts.map(p => p.replace(/^"|"$/g, '').trim());
+    });
+
+    expect(rows).toHaveLength(3);
+    expect(rows[0]).toEqual(['id', 'window', 'control', 'fullName', 'type', 'strategy', 'locator', 'x', 'y', 'width', 'height']);
+    expect(rows[1]).toEqual(['Calc.Btn7', 'Calc', 'Btn7', 'Calc.Btn7', 'button', 'ocr', '7', '10', '20', '40', '30']);
+    expect(rows[2]).toEqual(['Calc.Btn8', 'Calc', 'Btn8', 'Calc.Btn8', 'button', 'ocr', '8', '55', '20', '40', '30']);
+  });
 });
 
