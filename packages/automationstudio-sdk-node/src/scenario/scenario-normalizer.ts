@@ -22,7 +22,7 @@ export class ScenarioNormalizer {
         current.action === 'click' &&
         next.action === 'click' &&
         current.target === next.target &&
-        next.timestamp - current.timestamp <= DOUBLE_CLICK_MAX_GAP_MS
+        Number(next.timestamp) - Number(current.timestamp) <= DOUBLE_CLICK_MAX_GAP_MS
       ) {
         result.push({
           ...current,

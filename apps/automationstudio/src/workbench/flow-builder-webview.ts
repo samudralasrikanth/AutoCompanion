@@ -3139,6 +3139,7 @@ function openScreenAnalyzer(){
     host=document.createElement('div');
     host.id='surface-analyzer-modal';
     host.className='surface-analyzer-modal';
+    host.onclick=(e)=>{if(e.target===host)closeScreenAnalyzer()};
     document.body.appendChild(host);
   }
   analyzerOpen=true;
@@ -3149,7 +3150,11 @@ function openScreenAnalyzer(){
 function closeScreenAnalyzer(){
   document.getElementById('surface-analyzer-modal')?.remove();
   analyzerOpen=false;
+  surfaceAnalyzing=false;
+  render();
 }
+
+window.addEventListener('keydown',(e)=>{if(e.key==='Escape'&&analyzerOpen)closeScreenAnalyzer()});
 
 function toggleSurfaceControl(id,checked){surfaceSelectedIds=checked?[...new Set([...surfaceSelectedIds,id])]:surfaceSelectedIds.filter(value=>value!==id);renderAnalyzerModal()}
 function selectAllSurfaceControls(){surfaceSelectedIds=surfaceControls.map(c=>c.id);renderAnalyzerModal()}

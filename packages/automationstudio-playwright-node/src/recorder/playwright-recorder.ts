@@ -4,6 +4,10 @@ import { randomUUID } from 'crypto';
 import { chromiumLaunchOptions } from '../browser-launcher';
 
 export class PlaywrightRecorderPlugin implements IRecorderPlugin {
+  public readonly id = 'playwright';
+  public readonly name = 'Playwright Recorder';
+  public readonly technology = 'web';
+
   public metadata = {
     id: 'playwright',
     displayName: 'Playwright Recorder',
@@ -38,13 +42,12 @@ export class PlaywrightRecorderPlugin implements IRecorderPlugin {
     await this.page.exposeFunction('onUserAction', (action: any) => {
       if (this.state !== 'recording') return;
       this.emitEvent({
-        id: randomUUID(),
         type: action.type === 'click' ? 'mouse' : 'keyboard',
         action: action.type,
         x: action.type === 'click' ? 0 : undefined,
         y: action.type === 'click' ? 0 : undefined,
         key: action.type === 'input' ? 'input' : undefined,
-        timestamp: Date.now(),
+        timestamp: String(Date.now()),
         metadata: {
           selector: action.selector,
           value: action.value,
@@ -89,6 +92,10 @@ export class PlaywrightRecorderPlugin implements IRecorderPlugin {
 
   public onEvent(callback: (event: RawEvent) => void): void {
     this.eventCallbacks.push(callback);
+  }
+
+  public dispose(): void {
+    void this.stop();
   }
 
   public onDisconnected(callback: () => void): void {
