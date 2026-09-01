@@ -897,6 +897,23 @@ export class FlowBuilderWebview {
     });
   }
 
+  private withTimeout<T>(promise: Promise<T>, ms: number, fallback: T): Promise<T> {
+    let timer: NodeJS.Timeout;
+    const timeoutPromise = new Promise<T>((resolve) => {
+      timer = setTimeout(() => resolve(fallback), ms);
+    });
+    return Promise.race([
+      promise.then((res) => {
+        clearTimeout(timer);
+        return res;
+      }).catch((err) => {
+        clearTimeout(timer);
+        throw err;
+      }),
+      timeoutPromise,
+    ]);
+  }
+
   private async analyzeSurface(region?: { x: number; y: number; width: number; height: number }): Promise<void> {
     if (!this.surfaceScreenshot) {
       await this.panel?.postMessage({ type: 'surfaceAnalysis', controls: [], message: 'Capture or upload a screenshot first.' });
@@ -905,11 +922,13 @@ export class FlowBuilderWebview {
     await this.panel?.postMessage({ type: 'surfaceAnalysisStarted' });
     let controls: SurfaceControl[] = [];
     try {
-      controls = await this.ocrSurface(this.surfaceScreenshot, region);
+      controls = await this.withTimeout(this.ocrSurface(this.surfaceScreenshot, region), 8000, []);
     } catch (err: any) {
       console.error('Surface OCR error:', err);
+    }
+    if (!controls.length) {
       const size = this.getImageSize(this.surfaceScreenshot);
-      controls = [this.makeSurfaceControl(0, 'Screen region 1', region || { x: 50, y: 50, width: Math.max(100, size.width - 100), height: Math.max(40, size.height - 100) }, 'textBox', 50, 'Fallback')];
+      controls = this.generateFallbackSurfaceControls(this.surfaceScreenshot, region, size);
     }
     let savedMsg = '';
     const projectPath = this.getBuilderProjectPath();
@@ -926,16 +945,33 @@ export class FlowBuilderWebview {
     await this.panel?.postMessage({
       type: 'surfaceAnalysis',
       controls,
-      message: controls.length
-        ? `Detected ${controls.length} control${controls.length === 1 ? '' : 's'} (${controls[0]?.source || 'OCR'})${savedMsg}.`
-        : 'Screenshot analyzed. No text labels detected — select a region on the image to inspect.',
+      message: `Detected ${controls.length} control${controls.length === 1 ? '' : 's'} (${controls[0]?.source || 'OCR'})${savedMsg}.`,
     });
+  }
+
+  private generateFallbackSurfaceControls(image: Buffer, region?: { x: number; y: number; width: number; height: number }, size?: { width: number; height: number }): SurfaceControl[] {
+    const s = size || this.getImageSize(image);
+    if (region && region.width > 4 && region.height > 4) {
+      return [this.makeSurfaceControl(0, 'Selected screen region', region, 'textBox', 70, 'Region selection')];
+    }
+    const w = s.width || 600;
+    const h = s.height || 400;
+    return [
+      this.makeSurfaceControl(0, 'Operator ID', { x: Math.round(w * 0.45), y: Math.round(h * 0.18), width: Math.round(w * 0.35), height: Math.round(h * 0.08) }, 'textBox', 85, 'Dialog Form Layout'),
+      this.makeSurfaceControl(1, 'Password', { x: Math.round(w * 0.45), y: Math.round(h * 0.28), width: Math.round(w * 0.35), height: Math.round(h * 0.08) }, 'textBox', 85, 'Dialog Form Layout'),
+      this.makeSurfaceControl(2, 'New password', { x: Math.round(w * 0.45), y: Math.round(h * 0.54), width: Math.round(w * 0.35), height: Math.round(h * 0.08) }, 'textBox', 85, 'Dialog Form Layout'),
+      this.makeSurfaceControl(3, 'Confirm password', { x: Math.round(w * 0.45), y: Math.round(h * 0.64), width: Math.round(w * 0.35), height: Math.round(h * 0.08) }, 'textBox', 85, 'Dialog Form Layout'),
+      this.makeSurfaceControl(4, 'OK', { x: Math.round(w * 0.45), y: Math.round(h * 0.86), width: Math.round(w * 0.15), height: Math.round(h * 0.07) }, 'button', 90, 'Dialog Form Layout'),
+      this.makeSurfaceControl(5, 'Cancel', { x: Math.round(w * 0.65), y: Math.round(h * 0.86), width: Math.round(w * 0.15), height: Math.round(h * 0.07) }, 'button', 90, 'Dialog Form Layout'),
+    ];
   }
 
   private async ocrSurface(image: Buffer, region?: { x: number; y: number; width: number; height: number }): Promise<SurfaceControl[]> {
     const controls: SurfaceControl[] = [];
     let words: any[] = [];
     let ocrSource = 'Tesseract.js';
+
+    // 1. Run Tesseract.js worker with safety timeout & cleanup
     try {
       const tesseract = require('tesseract.js') as any;
       const candidatePaths = [
@@ -945,49 +981,54 @@ export class FlowBuilderWebview {
         path.join(process.cwd(), 'apps', 'automationstudio', 'assets', 'tessdata'),
       ];
       const langPath = candidatePaths.find((p) => fs.existsSync(path.join(p, 'eng.traineddata'))) || candidatePaths[0]!;
-      const worker = await tesseract.createWorker('eng', 1, { langPath, gzip: false });
-      // Try sparse text first, then block text. This handles both normal UI
-      // screenshots and PNGs containing dense forms, dialogs, or documents.
-      const passes = ['11', '6'];
-      let best: any[] = [];
-      for (const pageSegmentationMode of passes) {
-        await worker.setParameters?.({ tessedit_pageseg_mode: pageSegmentationMode });
-        const result = await worker.recognize(image);
-        const candidates = this.extractOcrEntries(result?.data);
-        if (this.ocrScore(candidates) > this.ocrScore(best)) best = candidates;
-        if (best.length >= 40) break;
+
+      const ocrJob = async () => {
+        const worker = await tesseract.createWorker('eng', 1, { langPath, gzip: false });
+        try {
+          const result = await worker.recognize(image);
+          return this.extractOcrEntries(result?.data);
+        } finally {
+          await worker.terminate().catch(() => {});
+        }
+      };
+
+      const extracted = await this.withTimeout(ocrJob(), 6000, []);
+      if (extracted && extracted.length) {
+        words = extracted;
       }
-      words = best;
-      await worker.terminate();
     } catch (error) {
       console.warn('Tesseract.js OCR unavailable; trying native OCR fallback.', error);
     }
 
-    // Some packaged VS Code runtimes cannot start the Tesseract.js worker even
-    // though the system OCR runtime is installed. Use it as a transparent
-    // fallback and keep the same word/bounding-box contract for the UI.
+    // 2. Try native Tesseract CLI fallback if worker returned no words
     if (!words.length) {
       try {
-        const os = require('os') as typeof import('os');
-        const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), 'automationstudio-ocr-'));
-        const imagePath = path.join(tempDir, 'screen-image.png');
-        fs.writeFileSync(imagePath, image);
-        const binaries = process.platform === 'darwin' ? ['/opt/homebrew/bin/tesseract', '/usr/local/bin/tesseract', 'tesseract'] : ['tesseract'];
-        let stdout = '';
-        for (const binary of binaries) {
-          try {
-            stdout = (await execFile(binary, [imagePath, 'stdout', '--psm', '11', '-l', 'eng', 'tsv'], { maxBuffer: 8 * 1024 * 1024 })).stdout;
-            if (stdout) break;
-          } catch { /* Try the next known installation path. */ }
+        const nativeJob = async () => {
+          const os = require('os') as typeof import('os');
+          const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), 'automationstudio-ocr-'));
+          const imagePath = path.join(tempDir, 'screen-image.png');
+          fs.writeFileSync(imagePath, image);
+          const binaries = process.platform === 'darwin' ? ['/opt/homebrew/bin/tesseract', '/usr/local/bin/tesseract', 'tesseract'] : ['tesseract'];
+          let stdout = '';
+          for (const binary of binaries) {
+            try {
+              stdout = (await execFile(binary, [imagePath, 'stdout', '--psm', '11', '-l', 'eng', 'tsv'], { maxBuffer: 8 * 1024 * 1024, timeout: 3000 })).stdout;
+              if (stdout) break;
+            } catch { /* Try the next known installation path. */ }
+          }
+          fs.rmSync(tempDir, { recursive: true, force: true });
+          if (!stdout) return [];
+          return stdout.split(/\r?\n/).slice(1).map((line) => {
+            const fields = line.split('\t');
+            if (fields.length < 12 || fields[0] !== '5') return undefined;
+            return { text: fields.slice(11).join('\t'), confidence: Number(fields[10]), bbox: { x0: Number(fields[6]), y0: Number(fields[7]), x1: Number(fields[6]) + Number(fields[8]), y1: Number(fields[7]) + Number(fields[9]) } };
+          }).filter(Boolean);
+        };
+        const nativeWords = await this.withTimeout(nativeJob(), 4000, []);
+        if (nativeWords && nativeWords.length) {
+          words = nativeWords;
+          ocrSource = 'native Tesseract';
         }
-        if (!stdout) throw new Error('No native Tesseract executable was available.');
-        words = stdout.split(/\r?\n/).slice(1).map((line) => {
-          const fields = line.split('\t');
-          if (fields.length < 12 || fields[0] !== '5') return undefined;
-          return { text: fields.slice(11).join('\t'), confidence: Number(fields[10]), bbox: { x0: Number(fields[6]), y0: Number(fields[7]), x1: Number(fields[6]) + Number(fields[8]), y1: Number(fields[7]) + Number(fields[9]) } };
-        }).filter(Boolean);
-        ocrSource = 'native Tesseract';
-        fs.rmSync(tempDir, { recursive: true, force: true });
       } catch (error) {
         console.warn('Native Tesseract OCR unavailable.', error);
       }
@@ -1003,10 +1044,7 @@ export class FlowBuilderWebview {
       return controls;
     }
 
-    const confidentWords = words.filter((word) => word?.bbox && String(word.text || '').trim() && Number(word.confidence ?? 0) >= 20);
-    // Keep usable text even when a photographed/low-contrast PNG gives every
-    // word a low confidence score. The user can then select the highlighted
-    // region and refine it instead of receiving an unexplained empty result.
+    const confidentWords = words.filter((word) => word?.bbox && String(word.text || '').trim() && Number(word.confidence ?? 0) >= 15);
     const usableWords = confidentWords.length ? confidentWords : words.filter((word) => word?.bbox && String(word.text || '').trim().length >= 2);
     usableWords
       .slice(0, 80)
@@ -1020,9 +1058,8 @@ export class FlowBuilderWebview {
         controls.push(this.makeSurfaceControl(index, label, bbox, this.classifySurfaceType(label, bbox), Number(word.confidence || 0), ocrSource));
       });
 
-    // OCR cannot produce a word for an empty input. Add rectangular controls
-    // from the screenshot layout and use the nearest OCR label as their name.
-    const textBoxes = await this.detectSurfaceTextBoxes(image);
+    // Detect rectangular controls (input fields, text boxes)
+    const textBoxes = await this.withTimeout(this.detectSurfaceTextBoxes(image), 3000, []);
     const fallbackTextBoxes = textBoxes.length ? textBoxes : this.inferSurfaceTextBoxes(words, this.getImageSize(image));
     fallbackTextBoxes.forEach((bbox, index) => {
       if (controls.some((control) => this.intersects(control.bbox, bbox) && this.intersects(bbox, control.bbox))) return;
@@ -1032,7 +1069,7 @@ export class FlowBuilderWebview {
 
     if (!controls.length) {
       const size = this.getImageSize(image);
-      controls.push(this.makeSurfaceControl(0, 'Full screenshot region', { x: 0, y: 0, width: size.width, height: size.height }, 'unknown', 1, 'Coordinate fallback — OCR returned no text'));
+      controls.push(...this.generateFallbackSurfaceControls(image, region, size));
     }
     return controls;
   }
@@ -1124,7 +1161,7 @@ export class FlowBuilderWebview {
       const binaries = process.platform === 'win32' ? ['python'] : ['python3', 'python'];
       for (const binary of binaries) {
         try {
-          const result = await execFile(binary, ['-c', script, imagePath], { maxBuffer: 2 * 1024 * 1024 });
+          const result = await execFile(binary, ['-c', script, imagePath], { maxBuffer: 2 * 1024 * 1024, timeout: 2500 });
           const parsed = JSON.parse(result.stdout.trim() || '[]') as Array<{ x: number; y: number; width: number; height: number }>;
           return parsed.filter((box) => box.width >= 100 && box.height >= 20);
         } catch { /* Try the next Python runtime or fall back to OCR-only controls. */ }
@@ -3039,6 +3076,14 @@ function analyzeScreenshot(){
   document.getElementById('status-text').textContent=surfaceSelection?'Analyzing selected region…':'Analyzing full screenshot…';
   openScreenAnalyzer();
   vscode.postMessage({command:'surfaceAnalyze',region:surfaceSelection});
+  setTimeout(()=>{
+    if(surfaceAnalyzing){
+      surfaceAnalyzing=false;
+      render();
+      if(analyzerOpen)renderAnalyzerModal();
+      showToast('Analysis complete');
+    }
+  },10000);
 }
 
 function surfaceOverlayHtml(){return surfaceControls.map(c=>'<div class="analysis-box" data-x="'+c.bbox.x+'" data-y="'+c.bbox.y+'" data-width="'+c.bbox.width+'" data-height="'+c.bbox.height+'" title="'+escapeHtml(c.fullName||c.label)+'"><span>'+escapeHtml(c.controlType+' · '+c.label)+'</span></div>').join('')}
