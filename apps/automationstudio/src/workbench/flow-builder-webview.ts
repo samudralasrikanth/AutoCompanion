@@ -3072,23 +3072,36 @@ function flowchartHtml(surface){
   });
   const rows=items.map(i=>{
     const s=i.step;
-    const selected=i.id===selectedId+'::'+window.flowStepIndex||i.id===selectedId;
+    const selected=(window.flowStepIndex!=null&&i.id===selectedId+'::'+window.flowStepIndex)||(window.flowStepIndex==null&&i.id===selectedId);
     const t=s.type||'step';
     const isReusable=t==='callAction'||t==='reusableAction'||t==='reusable';
     const kicker=isReusable?'Reusable Action':t;
     const badge=(isReusable&&s.children?.length!=null)?(s.children.length+' step'+(s.children.length===1?'':'s')):(s.controlType||'');
     const detail=isReusable?((s.children||[]).map(c=>c.label||c.type).join(' → ') || s.value):(s.target||s.value||'');
-    return '<div class="flow-item"><div class="flow-index">'+(t==='start'?'▶':t==='end'?'■':i.index-1)+'</div><div class="flow-card '+(surface?'surface-card ':'')+(isReusable?'reusable-block-card ':'')+(selected?'selected':'')+'" onclick="selectFlowStep(\''+i.id+'\')"><div class="flow-kicker"><span>'+(isReusable?'♻ ':'')+escapeHtml(kicker)+'</span>'+(badge?'<span class="badge '+(surface||isReusable?'surface':'')+'">'+escapeHtml(badge)+'</span>':'')+'</div><div class="flow-title">'+escapeHtml(s.label||kicker)+'</div>'+(detail?'<div class="flow-detail">'+escapeHtml(detail)+'</div>':'')+'</div></div>';
+    return '<div class="flow-item"><div class="flow-index">'+(t==='start'?'▶':t==='end'?'■':i.index-1)+'</div><div class="flow-card '+(surface?'surface-card ':'')+(isReusable?'reusable-block-card ':'')+(selected?'selected':'')+'" data-step-key="'+escapeHtml(i.id)+'" onclick="selectFlowStep(\''+escapeHtml(i.id)+'\')"><div class="flow-kicker"><span>'+(isReusable?'♻ ':'')+escapeHtml(kicker)+'</span>'+(badge?'<span class="badge '+(surface||isReusable?'surface':'')+'">'+escapeHtml(badge)+'</span>':'')+'</div><div class="flow-title">'+escapeHtml(s.label||kicker)+'</div>'+(detail?'<div class="flow-detail">'+escapeHtml(detail)+'</div>':'')+'</div></div>';
   }).join('');
   return '<div class="flowchart"><div class="flow-line"></div>'+rows+'</div>';
 }
 
-function renderCanvas(){document.getElementById('canvas-body').innerHTML=flowchartHtml(activeMode==='surface')}
+function renderCanvas(){
+  const body=document.getElementById('canvas-body');
+  if(!body)return;
+  body.innerHTML=flowchartHtml(activeMode==='surface');
+  if(!body.dataset.listenerAttached){
+    body.dataset.listenerAttached='true';
+    body.addEventListener('click',(e)=>{
+      const card=e.target.closest('.flow-card');
+      if(card&&card.dataset.stepKey){
+        selectFlowStep(card.dataset.stepKey);
+      }
+    });
+  }
+}
 
 function renderInspector(){
   const content=document.getElementById('inspector-content');
   const container=selectedNode();
-  const node=container&&container.type==='workflow'&&window.flowStepIndex!=null?container.steps[window.flowStepIndex]:container;
+  const node=container&&container.type==='workflow'&&window.flowStepIndex!=null&&container.steps?container.steps[window.flowStepIndex]:container;
   if(!node&&!selectedElement){
     document.getElementById('node-id').textContent='';
     content.className='empty';
@@ -3103,9 +3116,9 @@ function renderInspector(){
     return;
   }
   document.getElementById('inspector-title').textContent=activeMode==='surface'?'Surface step':'PW step';
-  document.getElementById('node-id').textContent=node.id||'';
+  document.getElementById('node-id').textContent=node.id||(container&&window.flowStepIndex!=null?container.id+' #'+(window.flowStepIndex+1):'');
   content.className='';
-  if(node.type==='workflow'){
+  if(node.type==='workflow'&&window.flowStepIndex==null){
     content.innerHTML='<div class="form-section"><div class="section-heading">Flow container</div><div class="field"><label>Name</label><input value="'+escapeHtml(node.label)+'" oninput="updateNode(\'label\',this.value)"></div><div class="field"><label>Scope</label><input value="'+escapeHtml(node.target||'')+'" oninput="updateNode(\'target\',this.value)"></div><div class="analysis-meta">'+(node.steps||[]).length+' ordered steps · select a step in the flowchart to edit it.</div></div>';
     return;
   }
@@ -3140,7 +3153,14 @@ function attachCurrentScreenshot(){
 function removeStepScreenshot(index){const step=currentEditableStep();if(!step||!step.screenshots)return;step.screenshots.splice(index,1);render()}
 function startInspectorResize(e){const workspace=document.querySelector('.workspace');if(!workspace)return;const move=(event)=>{const rect=workspace.getBoundingClientRect(),width=Math.max(240,Math.min(620,rect.right-event.clientX));workspace.style.gridTemplateColumns='255px minmax(260px,1fr) 6px '+width+'px'};const stop=()=>{window.removeEventListener('pointermove',move);window.removeEventListener('pointerup',stop)};window.addEventListener('pointermove',move);window.addEventListener('pointerup',stop);e.preventDefault()}
 
-function selectFlowStep(key){selectedElement=null;const parts=key.split('::');selectedId=parts[0];window.flowStepIndex=parts.length>1?Number(parts[1]):null;render()}
+window.selectFlowStep=function(key){
+  selectedElement=null;
+  const parts=String(key||'').split('::');
+  selectedId=parts[0];
+  window.flowStepIndex=parts.length>1?parseInt(parts[1],10):null;
+  render();
+};
+function selectFlowStep(key){window.selectFlowStep(key)}
 function selectElement(id){selectedElement=pwElements.find(e=>e.id===id)||null;selectedId=null;renderInspector();if(selectedElement)vscode.postMessage({command:'pwHighlight',locator:selectedElement.locator})}
 function highlightElement(id){const e=pwElements.find(x=>x.id===id);if(e){selectedElement=e;selectedId=null;renderInspector();vscode.postMessage({command:'pwHighlight',locator:e.locator})}}
 function selectProject(projectPath){if(projectPath)vscode.postMessage({command:'projectSelect',projectPath})}
@@ -3850,7 +3870,7 @@ nodes=sampleFlow(activeMode);
 scenarios=[{id:uid(),name:'Scenario 1: '+(activeMode==='surface'?'Surface Task':'Main Flow'),nodes:nodes}];
 activeScenarioIndex=0;
 selectedId=nodes[1].id;
-window.flowStepIndex=null;
+window.flowStepIndex=(nodes[1]&&nodes[1].steps&&nodes[1].steps.length)?0:null;
 render();
 const initialUrlInput=document.getElementById('pw-url');
 if(initialUrlInput)initialUrlInput.value=builderContext.url;
