@@ -3690,8 +3690,10 @@ window.addEventListener('message',e=>{
   }else if(m.type==='surfaceWindows'){
     surfaceWindows=m.windows||[];
     render();
-    if(!surfaceWindows.length)showToast('No application windows found — allow Screen Recording and refresh');
-    else if(m.message)showToast(m.message);
+    if(activeMode==='surface'){
+      if(!surfaceWindows.length)showToast('No application windows found — allow Screen Recording and refresh');
+      else if(m.message)showToast(m.message);
+    }
   }else if(m.type==='surfaceScreenshot'){
     surfaceImage=m.dataUrl;
     surfaceName=m.name||'Screenshot';
