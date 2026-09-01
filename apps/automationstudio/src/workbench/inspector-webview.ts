@@ -122,7 +122,7 @@ export class InspectorWebview {
         case 'action:exportDom':
           const dom = await session.exportDom();
           vscode.workspace.openTextDocument({ content: dom, language: 'html' }).then(doc => {
-            vscode.window.showTextDocument(doc);
+            vscode.window.showTextDocument(doc, { viewColumn: vscode.ViewColumn.Beside, preview: false });
           });
           break;
       }
