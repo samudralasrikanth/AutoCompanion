@@ -119,18 +119,8 @@ export class FlowBuilderWebview {
 
     if (this.panel !== panel) {
       this.panel = panel;
-
-      if (!this.fileWatcher) {
-        this.fileWatcher = vscode.workspace.createFileSystemWatcher('**/*.scenario');
-        this.fileWatcher.onDidChange(() => { void this.sendBuilderProjects(); });
-        this.fileWatcher.onDidCreate(() => { void this.sendBuilderProjects(); });
-        this.fileWatcher.onDidDelete(() => { void this.sendBuilderProjects(); });
-      }
-
       this.messageSubscription = panel.onDidReceiveMessage((message) => void this.handleMessage(message));
       panel.onDidDispose(() => {
-        this.fileWatcher?.dispose();
-        this.fileWatcher = undefined;
         this.messageSubscription?.dispose();
         this.messageSubscription = undefined;
         this.panel = undefined;
@@ -142,7 +132,6 @@ export class FlowBuilderWebview {
     panel.reveal(vscode.ViewColumn.Active);
     void this.sendBuilderProjects();
     void this.sendObjectList();
-    void this.sendSurfaceWindows();
     void this.sendReusableActions();
   }
 
@@ -797,7 +786,7 @@ export class FlowBuilderWebview {
         'JSON.stringify(output);',
       ].join(' ');
       try {
-        const result = await execFile('osascript', ['-l', 'JavaScript', '-e', script]);
+        const result = await execFile('osascript', ['-l', 'JavaScript', '-e', script], { timeout: 1000 });
         const windows = JSON.parse(result.stdout.trim() || '[]') as SurfaceWindow[];
         if (windows.length) return [{ id: 'desktop', appName: 'Desktop', label: 'Entire desktop', kind: 'desktop' }, ...windows];
       } catch (error) {
