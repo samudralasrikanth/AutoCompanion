@@ -1,0 +1,28 @@
+{
+  "name": "@automation-studio/runtime",
+  "version": "0.1.0",
+  "description": "Automation Studio Execution Runtime",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "scripts": {
+    "build": "tsc",
+    "build:watch": "tsc -w",
+    "test": "vitest run",
+    "test:coverage": "vitest run --coverage",
+    "typecheck": "tsc --noEmit",
+    "clean": "rm -rf dist"
+  },
+  "dependencies": {
+    "@automation-studio/events": "workspace:*",
+    "@automation-studio/logger": "workspace:*",
+    "@automation-studio/shared": "workspace:*",
+    "@automation-studio/types": "workspace:*",
+    "@automation-studio/registry": "workspace:*",
+    "@automation-studio/sdk": "workspace:*"
+  },
+  "devDependencies": {
+    "@types/node": "^22.20.1",
+    "typescript": "~5.6.0",
+    "vitest": "^2.0.0"
+  }
+}

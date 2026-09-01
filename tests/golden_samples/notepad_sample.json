@@ -1,0 +1,24 @@
+{
+  "workflow_name": "Notepad Golden Sample",
+  "steps": [
+    {
+      "action": "launch",
+      "target": "notepad.exe"
+    },
+    {
+      "action": "type",
+      "target": "TextEditor",
+      "text": "Hello Enterprise World"
+    },
+    {
+      "action": "verify",
+      "target": "TextEditor",
+      "condition": "text_equals",
+      "expected": "Hello Enterprise World"
+    },
+    {
+      "action": "close",
+      "target": "notepad.exe"
+    }
+  ]
+}

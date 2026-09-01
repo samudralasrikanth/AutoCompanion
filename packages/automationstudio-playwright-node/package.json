@@ -1,0 +1,21 @@
+{
+  "name": "@automation-studio/playwright",
+  "version": "0.1.0",
+  "description": "Playwright Plugin for Automation Studio",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "scripts": {
+    "build": "tsc",
+    "clean": "rm -rf dist"
+  },
+  "dependencies": {
+    "playwright-core": "^1.45.0",
+    "@automation-studio/inspector": "workspace:*",
+    "@automation-studio/recorder": "workspace:*",
+    "@automation-studio/sdk": "workspace:*",
+    "@automation-studio/types": "workspace:*"
+  },
+  "devDependencies": {
+    "typescript": "^5.5.3"
+  }
+}

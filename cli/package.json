@@ -1,0 +1,27 @@
+{
+  "name": "@automation-studio/cli",
+  "version": "0.1.0",
+  "description": "Automation Studio CLI Runner",
+  "bin": {
+    "automation": "./dist/index.js"
+  },
+  "scripts": {
+    "build": "tsc",
+    "build:watch": "tsc -w",
+    "test": "vitest run --passWithNoTests",
+    "typecheck": "tsc --noEmit",
+    "clean": "rm -rf dist"
+  },
+  "dependencies": {
+    "@automation-studio/runtime": "workspace:*",
+    "@automation-studio/types": "workspace:*",
+    "@automation-studio/shared": "workspace:*",
+    "@automation-studio/events": "workspace:*",
+    "@automation-studio/logger": "workspace:*",
+    "commander": "^12.0.0"
+  },
+  "devDependencies": {
+    "typescript": "~5.6.0",
+    "@types/node": "^22.0.0"
+  }
+}

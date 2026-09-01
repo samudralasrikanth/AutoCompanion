@@ -1,0 +1,20 @@
+{
+  "workflow_name": "Web Golden Sample",
+  "steps": [
+    {
+      "action": "launch",
+      "target": "chrome.exe",
+      "args": "https://www.google.com"
+    },
+    {
+      "action": "type",
+      "target": "SearchBox",
+      "text": "Automation Studio"
+    },
+    {
+      "action": "verify",
+      "target": "SearchBox",
+      "condition": "visible"
+    }
+  ]
+}

@@ -1,0 +1,93 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Automation Studio - Browser Test Fixture</title>
+    <style>
+        body { font-family: sans-serif; padding: 20px; }
+        .hidden { display: none; }
+        .box { padding: 10px; margin: 10px 0; border: 1px solid #ccc; }
+    </style>
+</head>
+<body>
+    <h1>Browser Test Fixture</h1>
+    
+    <div class="box">
+        <h2>Basic Inputs</h2>
+        <input type="text" id="text-input" placeholder="Enter text" />
+        <input type="password" id="password-input" placeholder="Enter password" />
+        <textarea id="textarea-input">Initial text</textarea>
+        
+        <br/><br/>
+        <label><input type="checkbox" id="checkbox-input" /> Check me</label>
+        <label><input type="radio" name="radio-group" id="radio-1" value="1" /> Option 1</label>
+        <label><input type="radio" name="radio-group" id="radio-2" value="2" /> Option 2</label>
+        
+        <br/><br/>
+        <select id="select-input">
+            <option value="opt1">Option 1</option>
+            <option value="opt2">Option 2</option>
+        </select>
+        
+        <br/><br/>
+        <button id="submit-button">Submit</button>
+        <button id="disabled-button" disabled>Disabled Button</button>
+    </div>
+
+    <div class="box">
+        <h2>Dynamic Behavior</h2>
+        <button id="trigger-dynamic">Trigger Dynamic Elements</button>
+        
+        <!-- Appears after 500ms -->
+        <div id="async-element" class="hidden">I am an async element</div>
+        
+        <!-- Changes from disabled to enabled after 500ms -->
+        <button id="async-enabled-button" disabled>Will be enabled</button>
+    </div>
+
+    <div class="box">
+        <h2>Iframes</h2>
+        <!-- Basic iframe pointing to a simple nested page or itself with a query param -->
+        <iframe id="test-iframe" src="?iframe=true" width="400" height="200"></iframe>
+        
+        <br/>
+        <button id="reload-iframe">Reload Iframe</button>
+    </div>
+
+    <div class="box">
+        <h2>Navigation</h2>
+        <button id="nav-same-page">Navigate Same Page</button>
+        <a id="nav-link" href="?navigated=true">Navigate Next</a>
+    </div>
+
+    <script>
+        // Stop recursion if we are the iframe
+        const urlParams = new URLSearchParams(window.location.search);
+        const isIframe = urlParams.get('iframe') === 'true';
+        if (isIframe) {
+            document.body.innerHTML = '<h2>Inside Iframe</h2><button id="iframe-button">Iframe Button</button>';
+        }
+
+        // Dynamic behavior
+        document.getElementById('trigger-dynamic')?.addEventListener('click', () => {
+            setTimeout(() => {
+                document.getElementById('async-element').classList.remove('hidden');
+                document.getElementById('async-enabled-button').removeAttribute('disabled');
+            }, 500);
+        });
+
+        // Iframe reload
+        document.getElementById('reload-iframe')?.addEventListener('click', () => {
+            const iframe = document.getElementById('test-iframe');
+            if (iframe) {
+                iframe.src = iframe.src;
+            }
+        });
+
+        // Same page navigation (hash change)
+        document.getElementById('nav-same-page')?.addEventListener('click', () => {
+            window.location.hash = "navigated";
+        });
+    </script>
+</body>
+</html>

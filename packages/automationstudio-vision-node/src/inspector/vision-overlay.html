@@ -1,0 +1,154 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Vision Vision Inspector</title>
+  <style>
+    body {
+      margin: 0;
+      padding: 0;
+      overflow: hidden;
+      background-color: var(--vscode-editor-background);
+      color: var(--vscode-editor-foreground);
+      font-family: var(--vscode-font-family);
+    }
+    #toolbar {
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 40px;
+      background: var(--vscode-editorGroupHeader-tabsBackground);
+      display: flex;
+      align-items: center;
+      padding: 0 10px;
+      box-sizing: border-box;
+      z-index: 10;
+      border-bottom: 1px solid var(--vscode-widget-border);
+    }
+    button {
+      background: var(--vscode-button-background);
+      color: var(--vscode-button-foreground);
+      border: none;
+      padding: 4px 12px;
+      margin-right: 8px;
+      cursor: pointer;
+    }
+    button:hover {
+      background: var(--vscode-button-hoverBackground);
+    }
+    #canvas-container {
+      position: absolute;
+      top: 40px;
+      left: 0;
+      width: 100%;
+      height: calc(100% - 40px);
+      overflow: auto;
+      background: #111;
+    }
+    canvas {
+      cursor: crosshair;
+      display: block;
+    }
+  </style>
+</head>
+<body>
+  <div id="toolbar">
+    <button id="btn-refresh">Capture Screen</button>
+    <span id="status" style="margin-left: 10px; font-size: 12px; color: var(--vscode-descriptionForeground);">Idle</span>
+  </div>
+  <div id="canvas-container">
+    <canvas id="overlay"></canvas>
+  </div>
+
+  <script>
+    const vscode = acquireVsCodeApi();
+    const canvas = document.getElementById('overlay');
+    const ctx = canvas.getContext('2d');
+    const statusEl = document.getElementById('status');
+    
+    let currentImage = null;
+    let isDrawing = false;
+    let startX = 0;
+    let startY = 0;
+    let currentX = 0;
+    let currentY = 0;
+
+    document.getElementById('btn-refresh').addEventListener('click', () => {
+      vscode.postMessage({ command: 'refresh' });
+      statusEl.innerText = 'Capturing...';
+    });
+
+    window.addEventListener('message', event => {
+      const message = event.data;
+      if (message.type === 'screenshot') {
+        const img = new Image();
+        img.onload = () => {
+          canvas.width = img.width;
+          canvas.height = img.height;
+          ctx.drawImage(img, 0, 0);
+          currentImage = img;
+          statusEl.innerText = `Captured (${img.width}x${img.height})`;
+        };
+        img.src = message.dataUrl; // base64 image
+      } else if (message.type === 'status') {
+        statusEl.innerText = message.text;
+      }
+    });
+
+    canvas.addEventListener('mousedown', (e) => {
+      if (!currentImage) return;
+      isDrawing = true;
+      const rect = canvas.getBoundingClientRect();
+      startX = e.clientX - rect.left;
+      startY = e.clientY - rect.top;
+      currentX = startX;
+      currentY = startY;
+    });
+
+    canvas.addEventListener('mousemove', (e) => {
+      if (!isDrawing || !currentImage) return;
+      const rect = canvas.getBoundingClientRect();
+      currentX = e.clientX - rect.left;
+      currentY = e.clientY - rect.top;
+      redraw();
+    });
+
+    canvas.addEventListener('mouseup', () => {
+      if (!isDrawing || !currentImage) return;
+      isDrawing = false;
+      const width = currentX - startX;
+      const height = currentY - startY;
+      
+      // Only process if the box is somewhat large
+      if (Math.abs(width) > 5 && Math.abs(height) > 5) {
+        const x = Math.min(startX, currentX);
+        const y = Math.min(startY, currentY);
+        const w = Math.abs(width);
+        const h = Math.abs(height);
+        
+        vscode.postMessage({
+          command: 'analyzeRegion',
+          region: { x, y, width: w, height: h }
+        });
+      }
+    });
+
+    function redraw() {
+      if (!currentImage) return;
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+      ctx.drawImage(currentImage, 0, 0);
+      
+      if (isDrawing) {
+        ctx.strokeStyle = 'red';
+        ctx.lineWidth = 2;
+        ctx.strokeRect(startX, startY, currentX - startX, currentY - startY);
+        
+        ctx.fillStyle = 'rgba(255, 0, 0, 0.2)';
+        ctx.fillRect(startX, startY, currentX - startX, currentY - startY);
+      }
+    }
+  </script>
+</body>
+</html>

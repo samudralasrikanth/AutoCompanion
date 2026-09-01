@@ -1,0 +1,11 @@
+src/
+!node_modules
+!node_modules/
+!node_modules/**
+package.json.tmp
+scripts/
+*.vsix
+test-pw.spec.ts
+tsconfig.json
+esbuild.config.mjs
+.vscode/

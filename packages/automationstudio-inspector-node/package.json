@@ -1,0 +1,14 @@
+{
+  "name": "@automation-studio/inspector",
+  "version": "0.1.0",
+  "description": "Inspector SDK for Automation Studio",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "scripts": {
+    "build": "tsc",
+    "clean": "rm -rf dist"
+  },
+  "devDependencies": {
+    "typescript": "^5.5.3"
+  }
+}

@@ -1,0 +1,10 @@
+packages:
+  - apps/*
+  - packages/*
+  - runtime
+  - cli
+  - reports
+  - frameworks/*
+
+onlyBuiltDependencies:
+  - esbuild

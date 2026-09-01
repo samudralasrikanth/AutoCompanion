@@ -1,0 +1,23 @@
+{
+  "name": "@automation-studio/reports",
+  "version": "0.1.0",
+  "description": "Automation Studio Report Engine",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "scripts": {
+    "build": "tsc",
+    "build:watch": "tsc -w",
+    "test": "vitest run --passWithNoTests",
+    "typecheck": "tsc --noEmit",
+    "clean": "rm -rf dist"
+  },
+  "dependencies": {
+    "@automation-studio/types": "workspace:*",
+    "@automation-studio/shared": "workspace:*",
+    "@automation-studio/events": "workspace:*"
+  },
+  "devDependencies": {
+    "typescript": "~5.6.0",
+    "@types/node": "^22.0.0"
+  }
+}

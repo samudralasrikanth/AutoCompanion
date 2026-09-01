@@ -1,0 +1,37 @@
+{
+  "name": "automation-studio",
+  "private": true,
+  "version": "0.1.0",
+  "description": "Automation Studio - Enterprise Test Automation Platform",
+  "engines": {
+    "node": ">=20.0.0",
+    "pnpm": ">=9.0.0"
+  },
+  "scripts": {
+    "build": "pnpm -r run build",
+    "test": "pnpm -r run test",
+    "test:coverage": "pnpm -r run test:coverage",
+    "lint": "eslint .",
+    "lint:fix": "eslint . --fix",
+    "format": "prettier --write \"**/*.{ts,json,md,yaml}\"",
+    "format:check": "prettier --check \"**/*.{ts,json,md,yaml}\"",
+    "typecheck": "pnpm -r run typecheck",
+    "clean": "pnpm -r run clean",
+    "vsix": "pnpm --filter automation-studio run package",
+    "prepare": "husky"
+  },
+  "devDependencies": {
+    "@eslint/js": "^9.39.4",
+    "@types/node": "^22.20.1",
+    "@typescript-eslint/eslint-plugin": "^8.0.0",
+    "@typescript-eslint/parser": "^8.0.0",
+    "eslint": "^9.0.0",
+    "eslint-config-prettier": "^9.0.0",
+    "husky": "^9.0.0",
+    "lint-staged": "^15.0.0",
+    "prettier": "^3.0.0",
+    "typescript": "~5.6.0",
+    "typescript-eslint": "^8.67.0",
+    "vitest": "^2.0.0"
+  }
+}

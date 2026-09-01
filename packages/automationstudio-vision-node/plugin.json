@@ -1,0 +1,8 @@
+{
+  "id": "automation-studio.vision",
+  "name": "Vision Automation",
+  "version": "0.1.0",
+  "engine": "^0.1.0",
+  "capabilities": ["inspector", "recorder", "executor"],
+  "main": "dist/index.js"
+}

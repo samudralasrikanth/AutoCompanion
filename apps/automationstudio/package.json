@@ -1,0 +1,932 @@
+{
+  "name": "automation-studio",
+  "displayName": "Automation Studio",
+  "description": "Visual web and Surface test automation with shared Playwright libraries, code generation, repeatable runs, and embedded HTML reports",
+  "icon": "assets/record-button.png",
+  "version": "0.2.11",
+  "publisher": "automationstudio",
+  "license": "UNLICENSED",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/samudralasrikanth/automation-studio"
+  },
+  "engines": {
+    "vscode": "^1.85.0",
+    "node": ">=18.0.0"
+  },
+  "categories": [
+    "Testing",
+    "Other"
+  ],
+  "keywords": [
+    "Playwright",
+    "visual testing",
+    "Surface automation",
+    "flow builder",
+    "test reports",
+    "Gherkin"
+  ],
+  "activationEvents": [
+    "onStartupFinished"
+  ],
+  "main": "./dist/extension.js",
+  "scripts": {
+    "build": "node esbuild.config.mjs",
+    "build:watch": "node esbuild.config.mjs --watch",
+    "test": "vitest run",
+    "test:coverage": "vitest run --coverage",
+    "typecheck": "tsc --noEmit",
+    "clean": "rm -rf dist out",
+    "package": "pnpm run build && rm -rf node_modules runtime-dependencies && cp package.json package.json.tmp && node -e \"const fs = require('fs'); const pkg = JSON.parse(fs.readFileSync('package.json', 'utf8')); delete pkg.devDependencies; fs.writeFileSync('package.json', JSON.stringify(pkg, null, 2));\" && npm install --omit=dev && node scripts/stage-runtime-dependencies.mjs && (npx -y @vscode/vsce package --no-dependencies --allow-missing-repository; status=$?; rm -rf runtime-dependencies; mv package.json.tmp package.json; pnpm install; exit $status)",
+    "vsix": "npm run package"
+  },
+  "contributes": {
+    "chatParticipants": [
+      {
+        "id": "automationstudio",
+        "name": "automationstudio",
+        "fullName": "Automation Studio",
+        "description": "Build and analyze unified PW and Surface automation assets from Copilot Chat.",
+        "isSticky": true
+      },
+      {
+        "id": "automatiostudio",
+        "name": "automatiostudio",
+        "fullName": "Automation Studio (alias)",
+        "description": "Automation Studio assistant alias.",
+        "isSticky": false
+      }
+    ],
+    "languageModelTools": [
+      {
+        "name": "automationStudio_build_object_repository",
+        "displayName": "Build Automation Studio Object Repository",
+        "userDescription": "Build or preview the unified Object Repository from saved Automation Studio scenarios.",
+        "toolReferenceName": "buildObjectRepository",
+        "icon": "$(references)",
+        "canBeReferencedInPrompt": true,
+        "tags": [
+          "automation",
+          "object repository",
+          "playwright",
+          "surface"
+        ],
+        "modelDescription": "Scan the current Automation Studio project scenarios and build a unified Object Repository containing reusable PW and Surface locators. Default to preview mode. Set write=true only when the user explicitly asks to save or update project files.",
+        "inputSchema": {
+          "type": "object",
+          "properties": {
+            "projectPath": {
+              "type": "string",
+              "description": "Optional current Automation Studio project path."
+            },
+            "scenarioPath": {
+              "type": "string",
+              "description": "Optional scenario JSON file or folder relative to the project."
+            },
+            "mode": {
+              "type": "string",
+              "enum": [
+                "pw",
+                "surface",
+                "all"
+              ],
+              "description": "Locator family to include."
+            },
+            "write": {
+              "type": "boolean",
+              "description": "Write generated objects to automation/object-repository. Use only after explicit user confirmation."
+            }
+          }
+        }
+      },
+      {
+        "name": "automationStudio_analyze_object",
+        "displayName": "Analyze Automation Studio Object",
+        "userDescription": "Inspect an object and propose manual locator corrections.",
+        "toolReferenceName": "analyzeAutomationObject",
+        "icon": "$(search)",
+        "canBeReferencedInPrompt": true,
+        "tags": [
+          "automation",
+          "object repository",
+          "locator",
+          "healing"
+        ],
+        "modelDescription": "Inspect an existing unified Automation Studio object and return its PW locator, Surface evidence, screenshot metadata, and proposed manual corrections. Set write=true only when the user explicitly asks to apply a correction.",
+        "inputSchema": {
+          "type": "object",
+          "properties": {
+            "projectPath": {
+              "type": "string",
+              "description": "Optional current Automation Studio project path."
+            },
+            "objectId": {
+              "type": "string",
+              "description": "Object URI such as object://app.login.username."
+            },
+            "write": {
+              "type": "boolean",
+              "description": "Apply the correction to the object repository."
+            },
+            "correction": {
+              "type": "object",
+              "description": "Optional fields to correct: name, type, description, tags, pw, surface, or screenshot."
+            }
+          },
+          "required": [
+            "objectId"
+          ]
+        }
+      },
+      {
+        "name": "automationStudio_generate_gherkin_hierarchy",
+        "displayName": "Generate Automation Studio Gherkin",
+        "userDescription": "Turn test-case text or a referenced file into a readable Gherkin hierarchy.",
+        "toolReferenceName": "generateAutomationGherkin",
+        "icon": "$(list-tree)",
+        "canBeReferencedInPrompt": true,
+        "tags": [
+          "automation",
+          "gherkin",
+          "bdd",
+          "test case"
+        ],
+        "modelDescription": "Convert test-case text or a project file into a Feature, Scenario, Given/When/Then hierarchy. Default to preview mode and write the .feature file only when the user explicitly asks to save it.",
+        "inputSchema": {
+          "type": "object",
+          "properties": {
+            "projectPath": {
+              "type": "string",
+              "description": "Optional current Automation Studio project path."
+            },
+            "text": {
+              "type": "string",
+              "description": "Test case or acceptance criteria text."
+            },
+            "filePath": {
+              "type": "string",
+              "description": "Project-relative test-case file path."
+            },
+            "scenarioName": {
+              "type": "string",
+              "description": "Optional feature/scenario name."
+            },
+            "write": {
+              "type": "boolean",
+              "description": "Save the generated feature file to automation/scenarios."
+            }
+          }
+        }
+      },
+      {
+        "name": "automationStudio_requirements_to_tests",
+        "displayName": "Generate Tests from Requirements",
+        "userDescription": "Turn natural language requirements into automated scenarios and Gherkin features.",
+        "toolReferenceName": "requirementsToTests",
+        "icon": "$(checklist)",
+        "canBeReferencedInPrompt": true,
+        "tags": [
+          "automation",
+          "tests",
+          "requirements",
+          "generation"
+        ],
+        "modelDescription": "Parse requirement text and generate a scenario and Gherkin feature file. Default to preview mode and write the files only when explicitly asked.",
+        "inputSchema": {
+          "type": "object",
+          "properties": {
+            "projectPath": {
+              "type": "string",
+              "description": "Optional current Automation Studio project path."
+            },
+            "text": {
+              "type": "string",
+              "description": "Requirement or user story text."
+            },
+            "filePath": {
+              "type": "string",
+              "description": "Optional file path containing the requirements."
+            },
+            "mode": {
+              "type": "string",
+              "enum": [
+                "pw",
+                "surface"
+              ],
+              "description": "Target engine mode."
+            },
+            "scenarioName": {
+              "type": "string",
+              "description": "Optional scenario name."
+            },
+            "write": {
+              "type": "boolean",
+              "description": "Save generated scenarios to the project."
+            }
+          }
+        }
+      },
+      {
+        "name": "automationStudio_test_design",
+        "displayName": "Design Test Strategy",
+        "userDescription": "Analyze the project and suggest a test coverage strategy.",
+        "toolReferenceName": "testDesign",
+        "icon": "$(lightbulb)",
+        "canBeReferencedInPrompt": true,
+        "tags": [
+          "automation",
+          "strategy",
+          "coverage",
+          "planning"
+        ],
+        "modelDescription": "Analyze existing scenarios to build a coverage matrix and suggest new scenarios based on gaps.",
+        "inputSchema": {
+          "type": "object",
+          "properties": {
+            "projectPath": {
+              "type": "string",
+              "description": "Optional current Automation Studio project path."
+            },
+            "scope": {
+              "type": "string",
+              "description": "Specific feature scope to analyze."
+            },
+            "coverageGoal": {
+              "type": "string",
+              "enum": [
+                "smoke",
+                "regression",
+                "full"
+              ],
+              "description": "Target coverage level."
+            },
+            "includeEdgeCases": {
+              "type": "boolean",
+              "description": "Whether to include edge cases in the suggestions."
+            }
+          }
+        }
+      },
+      {
+        "name": "automationStudio_rca",
+        "displayName": "Root Cause Analysis",
+        "userDescription": "Analyze a test failure and suggest a fix.",
+        "toolReferenceName": "rootCauseAnalysis",
+        "icon": "$(bug)",
+        "canBeReferencedInPrompt": true,
+        "tags": [
+          "automation",
+          "rca",
+          "debug",
+          "failure"
+        ],
+        "modelDescription": "Load a recent execution report, classify the failure reason, explain the root cause, and suggest a fix.",
+        "inputSchema": {
+          "type": "object",
+          "properties": {
+            "projectPath": {
+              "type": "string",
+              "description": "Optional current Automation Studio project path."
+            },
+            "executionId": {
+              "type": "string",
+              "description": "Specific execution ID to analyze, otherwise latest."
+            },
+            "reportPath": {
+              "type": "string",
+              "description": "Specific report file path."
+            }
+          }
+        }
+      },
+      {
+        "name": "automationStudio_self_heal",
+        "displayName": "Self-Heal Locators",
+        "userDescription": "Automatically repair broken locators from recent test failures.",
+        "toolReferenceName": "selfHeal",
+        "icon": "$(wand)",
+        "canBeReferencedInPrompt": true,
+        "tags": [
+          "automation",
+          "healing",
+          "locator",
+          "maintenance"
+        ],
+        "modelDescription": "Scan recent failure reports for broken locators and generate alternative locators (e.g. data-testid, roles). Default to preview (dryRun=true).",
+        "inputSchema": {
+          "type": "object",
+          "properties": {
+            "projectPath": {
+              "type": "string",
+              "description": "Optional current Automation Studio project path."
+            },
+            "scenarioPath": {
+              "type": "string",
+              "description": "Specific scenario to heal, otherwise all."
+            },
+            "failedStepId": {
+              "type": "string",
+              "description": "Specific step to heal."
+            },
+            "dryRun": {
+              "type": "boolean",
+              "description": "If true, only preview. If false, apply changes to files."
+            },
+            "write": {
+              "type": "boolean",
+              "description": "If true, apply changes (same as dryRun=false)."
+            }
+          }
+        }
+      },
+      {
+        "name": "automationStudio_release_readiness",
+        "displayName": "Assess Release Readiness",
+        "userDescription": "Evaluate test pass rates and flaky tests to determine release readiness.",
+        "toolReferenceName": "releaseReadiness",
+        "icon": "$(check-all)",
+        "canBeReferencedInPrompt": true,
+        "tags": [
+          "automation",
+          "release",
+          "quality",
+          "metrics"
+        ],
+        "modelDescription": "Analyze test execution history across the project to calculate pass rates, detect flaky tests, and provide a GO/NO_GO verdict.",
+        "inputSchema": {
+          "type": "object",
+          "properties": {
+            "projectPath": {
+              "type": "string",
+              "description": "Optional current Automation Studio project path."
+            },
+            "passThreshold": {
+              "type": "number",
+              "description": "Required pass rate percentage (default 95)."
+            },
+            "maxFlakyPercent": {
+              "type": "number",
+              "description": "Maximum allowed flaky test percentage (default 5)."
+            }
+          }
+        }
+      },
+      {
+        "name": "automationStudio_orchestrate",
+        "displayName": "Run Multi-Agent Pipeline",
+        "userDescription": "Run multiple AI agents in sequence (e.g., heal → rca → readiness).",
+        "toolReferenceName": "orchestrateAgents",
+        "icon": "$(circuit-board)",
+        "canBeReferencedInPrompt": true,
+        "tags": [
+          "automation",
+          "pipeline",
+          "orchestration",
+          "agents"
+        ],
+        "modelDescription": "Run a sequence of agents and summarize their results. Useful for full project maintenance sweeps.",
+        "inputSchema": {
+          "type": "object",
+          "properties": {
+            "projectPath": {
+              "type": "string",
+              "description": "Optional current Automation Studio project path."
+            },
+            "pipeline": {
+              "type": "array",
+              "items": {
+                "type": "string",
+                "enum": [
+                  "requirements",
+                  "design",
+                  "heal",
+                  "rca",
+                  "readiness"
+                ]
+              },
+              "description": "Array of agent names to run."
+            },
+            "write": {
+              "type": "boolean",
+              "description": "Allow agents to save changes to the project."
+            }
+          }
+        }
+      }
+    ],
+    "commands": [
+      {
+        "command": "automationStudio.runScenario",
+        "title": "Run Scenario",
+        "category": "Automation Studio",
+        "icon": "$(play)"
+      },
+      {
+        "command": "automationStudio.debugScenario",
+        "title": "Debug Scenario",
+        "category": "Automation Studio",
+        "icon": "$(debug-alt)"
+      },
+      {
+        "command": "automationStudio.showReport",
+        "title": "Show Report",
+        "category": "Automation Studio",
+        "icon": "$(report)"
+      },
+      {
+        "command": "automationStudio.frameworkManager.show",
+        "title": "Open Framework Manager",
+        "category": "Automation Studio",
+        "icon": "$(extensions)"
+      },
+      {
+        "command": "automationStudio.stopExecution",
+        "title": "Stop Execution",
+        "category": "Automation Studio",
+        "icon": "$(stop)"
+      },
+      {
+        "command": "automationStudio.deleteProject",
+        "title": "Delete Project",
+        "category": "Automation Studio",
+        "icon": "$(trash)"
+      },
+      {
+        "command": "automationStudio.showLogs",
+        "title": "Show Logs",
+        "category": "Automation Studio"
+      },
+      {
+        "command": "automationStudio.secret.store",
+        "title": "Store or Update Hidden Secret",
+        "category": "Automation Studio",
+        "icon": "$(key)"
+      },
+      {
+        "command": "automationStudio.secret.delete",
+        "title": "Delete Hidden Secret",
+        "category": "Automation Studio",
+        "icon": "$(trash)"
+      },
+      {
+        "command": "automationStudio.showVersion",
+        "title": "Show Version",
+        "category": "Automation Studio"
+      },
+      {
+        "command": "automationStudio.reloadConfiguration",
+        "title": "Reload Configuration",
+        "category": "Automation Studio"
+      },
+      {
+        "command": "automationStudio.checkHealth",
+        "title": "Check Health",
+        "category": "Automation Studio"
+      },
+      {
+        "command": "automationStudio.doctor",
+        "title": "Run Runtime Doctor",
+        "category": "Automation Studio",
+        "icon": "$(beaker)"
+      },
+      {
+        "command": "automationStudio.ai.generateScenario",
+        "title": "Automation Studio: Generate Scenario with AI",
+        "category": "Automation Studio"
+      },
+      {
+        "command": "automationStudio.project.create",
+        "title": "Create Project",
+        "category": "Automation Studio",
+        "icon": "$(add)"
+      },
+      {
+        "command": "automationStudio.project.open",
+        "title": "Open Project",
+        "category": "Automation Studio",
+        "icon": "$(folder-opened)"
+      },
+      {
+        "command": "automationStudio.project.close",
+        "title": "Close Project",
+        "category": "Automation Studio"
+      },
+      {
+        "command": "automationStudio.project.reload",
+        "title": "Reload Project",
+        "category": "Automation Studio",
+        "icon": "$(refresh)"
+      },
+      {
+        "command": "automationStudio.settings.open",
+        "title": "Open Settings",
+        "category": "Automation Studio",
+        "icon": "$(settings-gear)"
+      },
+      {
+        "command": "automationStudio.scenario.create",
+        "title": "Create Scenario",
+        "category": "Automation Studio",
+        "icon": "$(file-add)"
+      },
+      {
+        "command": "automationStudio.openResource",
+        "title": "Open",
+        "category": "Automation Studio"
+      },
+      {
+        "command": "automationStudio.revealResource",
+        "title": "Reveal in Finder",
+        "category": "Automation Studio"
+      },
+      {
+        "command": "automationStudio.renameResource",
+        "title": "Rename",
+        "category": "Automation Studio"
+      },
+      {
+        "command": "automationStudio.deleteResource",
+        "title": "Delete",
+        "category": "Automation Studio",
+        "icon": "$(trash)"
+      },
+      {
+        "command": "automationStudio.objectRepository.create",
+        "title": "Create Object Repository",
+        "category": "Automation Studio",
+        "icon": "$(repo)"
+      },
+      {
+        "command": "automationStudio.objectRepository.refresh",
+        "title": "Refresh Object Repository",
+        "category": "Automation Studio",
+        "icon": "$(refresh)"
+      },
+      {
+        "command": "automationStudio.recorder.generate",
+        "title": "Generate Script",
+        "category": "Automation Studio",
+        "icon": "$(hubot)"
+      },
+      {
+        "command": "automationStudio.dashboard.show",
+        "title": "Open Dashboard",
+        "category": "Automation Studio",
+        "icon": "$(home)"
+      },
+      {
+        "command": "automationStudio.flowBuilder.show",
+        "title": "Open Automation Studio Builder",
+        "category": "Automation Studio",
+        "icon": "$(type-hierarchy-sub)"
+      },
+      {
+        "command": "automationStudio.runtimeMonitor.show",
+        "title": "Open Runtime Monitor",
+        "category": "Automation Studio",
+        "icon": "$(pulse)"
+      },
+      {
+        "command": "automationStudio.startInspector",
+        "title": "Start Inspector",
+        "category": "Automation Studio"
+      },
+      {
+        "command": "automationStudio.createPlugin",
+        "title": "Create Plugin",
+        "category": "Automation Studio"
+      },
+      {
+        "command": "automationStudio.recorder.start",
+        "title": "Start Recording",
+        "category": "Automation Studio",
+        "icon": "$(record)"
+      },
+      {
+        "command": "automationStudio.recorder.pause",
+        "title": "Pause Recording",
+        "category": "Automation Studio",
+        "icon": "$(debug-pause)"
+      },
+      {
+        "command": "automationStudio.recorder.resume",
+        "title": "Resume Recording",
+        "category": "Automation Studio",
+        "icon": "$(play)"
+      },
+      {
+        "command": "automationStudio.recorder.stop",
+        "title": "Stop Recording",
+        "category": "Automation Studio",
+        "icon": "$(primitive-square)"
+      },
+      {
+        "command": "automationStudio.recorder.cancel",
+        "title": "Cancel Recording",
+        "category": "Automation Studio",
+        "icon": "$(discard)"
+      },
+      {
+        "command": "automationStudio.bitwarden.fetchCredentials",
+        "title": "Fetch Bitwarden Credentials",
+        "category": "Automation Studio",
+        "icon": "$(key)"
+      },
+      {
+        "command": "automationStudio.bitwarden.disconnect",
+        "title": "Disconnect Bitwarden Session",
+        "category": "Automation Studio"
+      }
+    ],
+    "keybindings": [
+      {
+        "command": "automationStudio.startInspector",
+        "key": "ctrl+shift+i",
+        "mac": "cmd+shift+i",
+        "when": "editorTextFocus"
+      }
+    ],
+    "menus": {
+      "editor/context": [
+        {
+          "command": "automationStudio.startInspector",
+          "group": "automation-studio",
+          "when": "editorTextFocus"
+        }
+      ],
+      "view/item/context": [
+        {
+          "command": "automationStudio.openResource",
+          "when": "view == automationStudio.projectExplorer && (viewItem == project || viewItem == scenario || viewItem == folder || viewItem == scenarioFolder || viewItem == reportFolder || viewItem == file)",
+          "group": "resource@1"
+        },
+        {
+          "command": "automationStudio.scenario.create",
+          "when": "view == automationStudio.projectExplorer && (viewItem == project || viewItem == scenarioFolder)",
+          "group": "resource@2"
+        },
+        {
+          "command": "automationStudio.renameResource",
+          "when": "view == automationStudio.projectExplorer && (viewItem == project || viewItem == scenario || viewItem == folder || viewItem == scenarioFolder || viewItem == reportFolder || viewItem == file)",
+          "group": "resource@3"
+        },
+        {
+          "command": "automationStudio.revealResource",
+          "when": "view == automationStudio.projectExplorer && (viewItem == project || viewItem == scenario || viewItem == folder || viewItem == scenarioFolder || viewItem == reportFolder || viewItem == file)",
+          "group": "resource@4"
+        },
+        {
+          "command": "automationStudio.deleteResource",
+          "when": "view == automationStudio.projectExplorer && (viewItem == scenario || viewItem == folder || viewItem == scenarioFolder || viewItem == reportFolder || viewItem == file)",
+          "group": "inline@3"
+        },
+        {
+          "command": "automationStudio.runScenario",
+          "when": "viewItem == scenario",
+          "group": "inline@1"
+        },
+        {
+          "command": "automationStudio.debugScenario",
+          "when": "viewItem == scenario",
+          "group": "inline@2"
+        },
+        {
+          "command": "automationStudio.deleteProject",
+          "when": "viewItem == project",
+          "group": "inline@1"
+        }
+      ],
+      "view/title": [
+        {
+          "command": "automationStudio.ai.generateScenario",
+          "when": "view == automationStudio.projectExplorer",
+          "group": "project@1"
+        },
+        {
+          "command": "automationStudio.project.create",
+          "when": "view == automationStudio.projectExplorer",
+          "group": "navigation@1"
+        },
+        {
+          "command": "automationStudio.project.open",
+          "when": "view == automationStudio.projectExplorer",
+          "group": "navigation@2"
+        },
+        {
+          "command": "automationStudio.flowBuilder.show",
+          "when": "view == automationStudio.projectExplorer",
+          "group": "navigation@3"
+        },
+        {
+          "command": "automationStudio.settings.open",
+          "when": "view == automationStudio.projectExplorer",
+          "group": "navigation@4"
+        },
+        {
+          "command": "automationStudio.recorder.start",
+          "when": "view == automationStudio.projectExplorer && automationStudio.recordingState != recording && automationStudio.recordingState != paused",
+          "group": "navigation@4"
+        },
+        {
+          "command": "automationStudio.recorder.pause",
+          "when": "view == automationStudio.projectExplorer && automationStudio.recordingState == recording",
+          "group": "navigation@5"
+        },
+        {
+          "command": "automationStudio.recorder.resume",
+          "when": "view == automationStudio.projectExplorer && automationStudio.recordingState == paused",
+          "group": "navigation@6"
+        },
+        {
+          "command": "automationStudio.recorder.stop",
+          "when": "view == automationStudio.projectExplorer && (automationStudio.recordingState == recording || automationStudio.recordingState == paused)",
+          "group": "navigation@7"
+        }
+      ]
+    },
+    "customEditors": [
+      {
+        "viewType": "automationStudio.scenarioEditor",
+        "displayName": "Scenario Editor",
+        "selector": [
+          {
+            "filenamePattern": "*.scenario.json"
+          }
+        ],
+        "priority": "default"
+      }
+    ],
+    "viewsContainers": {
+      "activitybar": [
+        {
+          "id": "automation-studio-explorer",
+          "title": "Automation Studio",
+          "icon": "assets/record-button.png"
+        }
+      ],
+      "panel": [
+        {
+          "id": "automationStudio",
+          "title": "Automation Studio",
+          "icon": "assets/record-button.png"
+        }
+      ]
+    },
+    "views": {
+      "automation-studio-explorer": [
+        {
+          "id": "automationStudio.projectExplorer",
+          "name": "Project Explorer",
+          "icon": "$(folder)"
+        },
+        {
+          "id": "automationStudio.objectRepository",
+          "name": "Object Repository",
+          "type": "webview",
+          "icon": "$(repo)"
+        },
+        {
+          "id": "automationStudio.environmentHealth",
+          "name": "Environment Health",
+          "icon": "$(pulse)"
+        },
+        {
+          "id": "automationStudio.flowBuilderLauncher",
+          "name": "Automation Studio Builder",
+          "icon": "$(type-hierarchy-sub)"
+        }
+      ],
+      "automationStudio": [
+        {
+          "type": "webview",
+          "id": "automationStudio.consoleView",
+          "name": "Output Console",
+          "icon": "assets/record-button.png"
+        }
+      ]
+    },
+    "debuggers": [
+      {
+        "type": "automation-studio",
+        "label": "Automation Studio Scenario",
+        "configurationAttributes": {
+          "launch": {
+            "required": [
+              "scenarioPath"
+            ],
+            "properties": {
+              "scenarioPath": {
+                "type": "string",
+                "description": "Absolute path to the .scenario.json file",
+                "default": "${file}"
+              }
+            }
+          }
+        },
+        "initialConfigurations": [
+          {
+            "type": "automation-studio",
+            "request": "launch",
+            "name": "Debug Current Scenario",
+            "scenarioPath": "${file}"
+          }
+        ]
+      }
+    ],
+    "configuration": {
+      "title": "Automation Studio",
+      "properties": {
+        "automationStudio.pythonPath": {
+          "type": "string",
+          "default": "python",
+          "description": "Path to the Python interpreter"
+        },
+        "automationStudio.developerMode": {
+          "type": "string",
+          "enum": [
+            "normal",
+            "developer",
+            "diagnostic"
+          ],
+          "default": "normal",
+          "description": "Control the depth of IPC and execution events tracing"
+        },
+        "automationStudio.logging.level": {
+          "type": "string",
+          "enum": [
+            "trace",
+            "debug",
+            "info",
+            "warn",
+            "error",
+            "fatal"
+          ],
+          "default": "info",
+          "description": "Logging level"
+        },
+        "automationStudio.recorder.captureScreenshots": {
+          "type": "boolean",
+          "default": true,
+          "description": "Capture screenshots during recording"
+        },
+        "automationStudio.report.autoOpen": {
+          "type": "boolean",
+          "default": true,
+          "description": "Automatically open reports after generation"
+        },
+        "automationStudio.ai.provider": {
+          "type": "string",
+          "enum": [
+            "openai",
+            "anthropic",
+            "gemini",
+            "azure",
+            "openrouter",
+            "ollama",
+            "none"
+          ],
+          "default": "none",
+          "description": "AI provider for code generation"
+        },
+        "automationStudio.ai.model": {
+          "type": "string",
+          "default": "",
+          "description": "AI model name"
+        },
+        "automationStudio.telemetry.enabled": {
+          "type": "boolean",
+          "default": false,
+          "description": "Enable anonymous telemetry"
+        }
+      }
+    }
+  },
+  "dependencies": {
+    "playwright-core": "^1.45.0",
+    "screenshot-desktop": "^1.15.0",
+    "tesseract.js": "^5.0.5",
+    "uiohook-napi": "^1.5.5"
+  },
+  "devDependencies": {
+    "@anthropic-ai/sdk": ">=0.0.0",
+    "@automation-studio/events": "workspace:*",
+    "@automation-studio/inspector": "workspace:*",
+    "@automation-studio/logger": "workspace:*",
+    "@automation-studio/playwright": "workspace:*",
+    "@automation-studio/recorder": "workspace:*",
+    "@automation-studio/registry": "workspace:*",
+    "@automation-studio/runtime": "workspace:*",
+    "@automation-studio/sdk": "workspace:*",
+    "@automation-studio/shared": "workspace:*",
+    "@automation-studio/types": "workspace:*",
+    "@automation-studio/vision": "workspace:*",
+    "@types/node": "^22.0.0",
+    "@types/vscode": "^1.85.0",
+    "@vscode/debugadapter": "^1.68.0",
+    "@vscode/debugprotocol": "^1.68.0",
+    "@vscode/test-electron": "^2.4.0",
+    "esbuild": "^0.23.0",
+    "typescript": "~5.6.0",
+    "vitest": "^2.0.0"
+  }
+}

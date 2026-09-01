@@ -1,0 +1,70 @@
+/**
+ * DI Service Identifiers.
+ * All service symbols used throughout the platform.
+ * Using symbols ensures type-safe, unique service registration.
+ */
+
+import { createServiceIdentifier } from '@automation-studio/types';
+import type {
+  IEventBus,
+  ILogger,
+  IConfigurationService,
+  IWorkspaceService,
+  ICommandService,
+  ILoggingService,
+  IEventService,
+  IExtensionService,
+  IPluginService,
+  ISettingsService,
+  IStateService,
+  IProjectService,
+  ICommandRegistry,
+  IPluginHost,
+  ILifecycleService,
+  IStateManager,
+  ISecretStorage,
+  IConfigurationProvider,
+} from '@automation-studio/types';
+
+export const TYPES = {
+  EventBus: createServiceIdentifier<IEventBus>('IEventBus'),
+  Logger: createServiceIdentifier<ILogger>('ILogger'),
+  ConfigurationService: createServiceIdentifier<IConfigurationService>('IConfigurationService'),
+  ConfigurationProvider: createServiceIdentifier<IConfigurationProvider>('IConfigurationProvider'),
+  WorkspaceService: createServiceIdentifier<IWorkspaceService>('IWorkspaceService'),
+  CommandService: createServiceIdentifier<ICommandService>('ICommandService'),
+  CommandRegistry: createServiceIdentifier<ICommandRegistry>('ICommandRegistry'),
+  LoggingService: createServiceIdentifier<ILoggingService>('ILoggingService'),
+  EventService: createServiceIdentifier<IEventService>('IEventService'),
+  ExtensionService: createServiceIdentifier<IExtensionService>('IExtensionService'),
+  PluginService: createServiceIdentifier<IPluginService>('IPluginService'),
+  PluginHost: createServiceIdentifier<IPluginHost>('IPluginHost'),
+  SettingsService: createServiceIdentifier<ISettingsService>('ISettingsService'),
+  StateService: createServiceIdentifier<IStateService>('IStateService'),
+  StateManager: createServiceIdentifier<IStateManager>('IStateManager'),
+  SecretStorage: createServiceIdentifier<ISecretStorage>('ISecretStorage'),
+  ProjectService: createServiceIdentifier<IProjectService>('IProjectService'),
+  LifecycleService: createServiceIdentifier<ILifecycleService>('ILifecycleService'),
+  // Workbench Infrastructure
+  NotificationService: Symbol.for('NotificationService'),
+  EnvironmentService: Symbol.for('EnvironmentService'),
+  IconRegistry: Symbol.for('IconRegistry'),
+  ThemeService: Symbol.for('ThemeService'),
+  ContextKeyService: Symbol.for('ContextKeyService'),
+  WebviewHost: Symbol.for('WebviewHost'),
+  WorkbenchStatusService: Symbol.for('WorkbenchStatusService'),
+  TreeNodeRegistry: Symbol.for('TreeNodeRegistry'),
+  CardRegistry: Symbol.for('CardRegistry'),
+  QuickActionRegistry: Symbol.for('QuickActionRegistry'),
+  ExecutionManager: Symbol.for('ExecutionManager'),
+  ReportWebview: Symbol.for('ReportWebview'),
+  TechnologyRegistry: Symbol.for('TechnologyRegistry'),
+  FrameworkManager: Symbol.for('FrameworkManager'),
+  FrameworkManagerWebview: Symbol.for('FrameworkManagerWebview'),
+  PluginLoader: Symbol.for('PluginLoader'),
+  HomeWorkbench: Symbol.for('HomeWorkbench'),
+  FlowBuilderWebview: Symbol.for('FlowBuilderWebview'),
+  RuntimeMonitorWebview: Symbol.for('RuntimeMonitorWebview'),
+  RecorderRegistry: Symbol.for('RecorderRegistry'),
+  RecorderManager: Symbol.for('RecorderManager'),
+} as const;

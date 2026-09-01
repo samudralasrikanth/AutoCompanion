@@ -1,0 +1,11 @@
+{
+  "id": "automation-studio-python",
+  "version": "0.1.0",
+  "framework": "python",
+  "capabilities": ["executor"],
+  "executor": {
+    "fileExtensions": [".py"]
+  },
+  "minimumRuntime": "0.1.0",
+  "dependencies": {}
+}

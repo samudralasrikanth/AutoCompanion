@@ -1,0 +1,118 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Automation Inspector</title>
+  <style>
+    body { font-family: var(--vscode-font-family); color: var(--vscode-foreground); background-color: var(--vscode-editor-background); padding: 10px; }
+    .card { background-color: var(--vscode-editorWidget-background); border: 1px solid var(--vscode-widget-border); padding: 10px; margin-bottom: 10px; border-radius: 4px; }
+    h3 { margin-top: 0; font-size: 14px; border-bottom: 1px solid var(--vscode-widget-border); padding-bottom: 5px; }
+    .metadata-row { display: flex; justify-content: space-between; margin-bottom: 4px; font-size: 12px; }
+    .locator-item { display: flex; align-items: center; justify-content: space-between; padding: 4px; background: var(--vscode-input-background); margin-bottom: 4px; border-radius: 2px; font-family: monospace; font-size: 11px; cursor: pointer; }
+    .locator-item:hover { background: var(--vscode-list-hoverBackground); }
+    .stars { color: #e3a826; }
+    button { background: var(--vscode-button-background); color: var(--vscode-button-foreground); border: none; padding: 6px 10px; cursor: pointer; border-radius: 2px; width: 100%; margin-top: 5px; }
+    button:hover { background: var(--vscode-button-hoverBackground); }
+    .toolbar { display: flex; gap: 5px; margin-bottom: 10px; }
+    .toolbar button { width: auto; flex: 1; margin-top: 0; }
+    #disconnected-overlay { display: none; position: absolute; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.8); color: white; justify-content: center; align-items: center; flex-direction: column; z-index: 1000; }
+  </style>
+</head>
+<body>
+  <div id="disconnected-overlay">
+    <h2>Browser Disconnected</h2>
+    <button onclick="location.reload()" style="width: auto;">Reconnect</button>
+  </div>
+
+  <div class="toolbar">
+    <button id="record-btn" onclick="sendCommand('action:record')" style="background: var(--vscode-charts-red); color: white;">● Record</button>
+    <button onclick="sendCommand('action:pause')">Pause</button>
+    <button onclick="sendCommand('action:resume')">Resume</button>
+    <button onclick="sendCommand('action:refresh')">Refresh</button>
+    <button onclick="sendCommand('action:exportDom')">DOM</button>
+    <button onclick="sendCommand('action:stop')">Stop</button>
+  </div>
+
+  <div class="card">
+    <h3>Current Browser</h3>
+    <div style="font-size: 12px;">Playwright (Chromium)</div>
+  </div>
+
+  <div class="card">
+    <h3>Selected Element</h3>
+    <div id="metadata-container">Hover over an element in the browser...</div>
+  </div>
+
+  <div class="card">
+    <h3>Locator Suggestions</h3>
+    <div id="locators-container">No element selected.</div>
+  </div>
+
+  <div class="card">
+    <h3>Actions</h3>
+    <button id="add-btn" disabled>Add to Repository</button>
+  </div>
+
+  <script>
+    const vscode = acquireVsCodeApi();
+    const metadataContainer = document.getElementById('metadata-container');
+    const locatorsContainer = document.getElementById('locators-container');
+    const addBtn = document.getElementById('add-btn');
+
+    let currentSelection = null;
+
+    window.addEventListener('message', event => {
+      const message = event.data;
+      if (message.command === 'elementSelected') {
+        currentSelection = message;
+        
+        // Update Metadata
+        metadataContainer.innerHTML = `
+          <div class="metadata-row"><strong>Tag:</strong> <span>${message.metadata.tagName}</span></div>
+          <div class="metadata-row"><strong>ID:</strong> <span>${message.metadata.id || '-'}</span></div>
+          <div class="metadata-row"><strong>Text:</strong> <span>${message.metadata.text || '-'}</span></div>
+        `;
+
+        // Update Locators
+        locatorsContainer.innerHTML = message.candidates.map(c => {
+          const stars = '★'.repeat(Math.round(c.confidence / 20)) + '☆'.repeat(5 - Math.round(c.confidence / 20));
+          return `
+            <div class="locator-item" onclick="highlightLocator('${c.strategy}', '${c.value}')">
+              <span><span class="stars">${stars}</span> ${c.strategy}</span>
+              <span style="opacity: 0.7; margin-left: 10px; text-overflow: ellipsis; overflow: hidden; white-space: nowrap;">${c.value}</span>
+            </div>
+          `;
+        }).join('');
+
+        addBtn.disabled = false;
+      } else if (message.command === 'disconnected') {
+        document.getElementById('disconnected-overlay').style.display = 'flex';
+      } else if (message.command === 'recordingStarted') {
+        document.getElementById('record-btn').innerText = '⏹ Stop Recording';
+        document.getElementById('record-btn').setAttribute('onclick', "sendCommand('action:stopRecord')");
+      } else if (message.command === 'recordingStopped') {
+        document.getElementById('record-btn').innerText = '● Record';
+        document.getElementById('record-btn').setAttribute('onclick', "sendCommand('action:record')");
+      }
+    });
+
+    addBtn.addEventListener('click', () => {
+      if (currentSelection) {
+        vscode.postMessage({
+          command: 'addToRepository',
+          name: currentSelection.metadata.id || currentSelection.metadata.tagName + 'Element'
+        });
+      }
+    });
+
+    function highlightLocator(strategy, value) {
+      vscode.postMessage({ command: 'highlight', strategy, value });
+    }
+
+    function sendCommand(cmd) {
+      vscode.postMessage({ command: cmd });
+    }
+  </script>
+</body>
+</html>
